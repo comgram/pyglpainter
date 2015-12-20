@@ -10,8 +10,8 @@ from PyQt5.QtGui import QColor, QMatrix4x4, QVector2D, QVector3D, QQuaternion
 from PyQt5.QtOpenGL import QGLWidget
 
 import OpenGL
-OpenGL.ERROR_CHECKING = False
-OpenGL.FULL_LOGGING = False
+OpenGL.ERROR_CHECKING = True
+OpenGL.FULL_LOGGING = True
 from OpenGL.GL import *
 
 class Item():
@@ -119,6 +119,8 @@ class Item():
             glPolygonMode( GL_FRONT_AND_BACK, GL_FILL )
         else:
             glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
+        
+        glUseProgram(self.program)
         
         mat_m = self.qt_mat_to_array(mat_m)
         loc_mat_m = glGetUniformLocation(self.program, "mat_m")

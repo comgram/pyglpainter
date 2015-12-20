@@ -7,8 +7,8 @@ import math
 import os
 
 import OpenGL
-OpenGL.ERROR_CHECKING = False
-OpenGL.FULL_LOGGING = False
+OpenGL.ERROR_CHECKING = True
+OpenGL.FULL_LOGGING = True
 from OpenGL.GL import *
 
 from .item import *
@@ -67,11 +67,12 @@ class PainterWidget(QGLWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self._timer_timeout)
 
-        # We only run one GL program
-        self.gl_program = None
+        self.programs = {}
         
         # This will contain all items (3D objects) in the scene
         self.items = {}
+        
+        
     
 
     def initializeGL(self):
@@ -85,37 +86,9 @@ class PainterWidget(QGLWidget):
         print("OPENGL RENDERER", glGetString(GL_RENDERER))
         print("OPENGL GLSL VERSION", glGetString(GL_SHADING_LANGUAGE_VERSION))
         
-        
-        self.gl_program  = glCreateProgram()
-        
-        # create vertex and fragment shaders which are temporary
-        vertex   = glCreateShader(GL_VERTEX_SHADER)
-        fragment = glCreateShader(GL_FRAGMENT_SHADER)
-        
-        # set the GLSL sources
-        with open(os.path.dirname(os.path.realpath(__file__)) + "/shaders/simple3d-vertex.c", "r") as f: vertex_code = f.read()
-        with open(os.path.dirname(os.path.realpath(__file__)) + "/shaders/simple3d-fragment.c", "r") as f: fragment_code = f.read()
-        glShaderSource(vertex, vertex_code)
-        glShaderSource(fragment, fragment_code)
-        
-        # compile shaders
-        glCompileShader(vertex)
-        glCompileShader(fragment)
-        
-        # associate the shaders with the program
-        glAttachShader(self.gl_program, vertex)
-        glAttachShader(self.gl_program, fragment)
-        
-        # link the program
-        glLinkProgram(self.gl_program)
-        
-        # once compiled and linked, the shaders are in the firmware
-        # and can be discarded from the application context
-        glDetachShader(self.gl_program, vertex)
-        glDetachShader(self.gl_program, fragment)
-        
-        # we use our only program
-        glUseProgram(self.gl_program)
+        self.create_program("simple3d", "simple3d-vertex.c", "simple3d-fragment.c")
+        self.create_program("simple2d", "simple2d-vertex.c", "simple2d-fragment.c")
+        #glUseProgram(self.programs["simple3d"])
         
         # some global OpenGL settings
         glEnable(GL_DEPTH_TEST)
@@ -133,6 +106,38 @@ class PainterWidget(QGLWidget):
         # fire the timer every 10 milliseconds
         # this will re-draw the scene if self.dirty is True
         self.timer.start(10)
+
+
+    def create_program(self, label, vertex_filename, fragment_filename):
+        prog = glCreateProgram()
+        
+        # create vertex and fragment shaders which are temporary
+        vertex   = glCreateShader(GL_VERTEX_SHADER)
+        fragment = glCreateShader(GL_FRAGMENT_SHADER)
+        
+        # set the GLSL sources
+        with open(os.path.dirname(os.path.realpath(__file__)) + "/shaders/" + vertex_filename, "r") as f: vertex_code = f.read()
+        with open(os.path.dirname(os.path.realpath(__file__)) + "/shaders/" + fragment_filename, "r") as f: fragment_code = f.read()
+        glShaderSource(vertex, vertex_code)
+        glShaderSource(fragment, fragment_code)
+        
+        # compile shaders
+        glCompileShader(vertex)
+        glCompileShader(fragment)
+        
+        # associate the shaders with the program
+        glAttachShader(prog, vertex)
+        glAttachShader(prog, fragment)
+        
+        # link the program
+        glLinkProgram(prog)
+        
+        # once compiled and linked, the shaders are in the firmware
+        # and can be discarded from the application context
+        glDetachShader(prog, vertex)
+        glDetachShader(prog, fragment)
+        
+        self.programs[label] = prog
         
         
     def remove_item(self, label):
@@ -167,48 +172,50 @@ class PainterWidget(QGLWidget):
         
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         
-        
-        # ======= VIEW MATRIX BEGIN ==========
-        # rotate and translate the View matrix by mouse controlled vectors
-        mat_v = QMatrix4x4() # start with a unity matrix
-        
-        # the order of translate and rotate is significant!
-        # here we do traslate/rotate/translate for subjectively good mouse interaction
-        mat_v.translate(self._translation_vec) # math is done by Qt!
-        mat_v.rotate(self._rotation_quat) # math is done by Qt!
-        mat_v.translate(self._translation_vec) # math is done by Qt!
-        
-        
-        mat_v = Item.qt_mat_to_array(mat_v) # Transform Qt object to Python list
-        
-        # make the View matrix accessible to the vertex shader as the variable name "mat_v"
-        loc_mat_v = glGetUniformLocation(self.gl_program, "mat_v")
-        # copy the data into the "mat_v" GPU variable
-        glUniformMatrix4fv(loc_mat_v, 1, GL_TRUE, mat_v)
-        # ======= PROJECTION MATRIX END ==========
-        
-        
-        # ======= PROJECTION MATRIX BEGIN ==========
-        # calculate the aspect ratio of the window
-        
-        mat_p = QMatrix4x4() # start with a unity matrix
-        mat_p.perspective(90, self.aspect, 0.1, 100000) # math is done by Qt!
-        
-        mat_p = Item.qt_mat_to_array(mat_p) #Transform Qt object to Python list
-        
-        # make the View matrix accessible to the vertex shader as the variable name "mat_p"
-        loc_mat_p = glGetUniformLocation(self.gl_program, "mat_p")
-        # copy the data into the "mat_p" GPU variable
-        glUniformMatrix4fv(loc_mat_p, 1, GL_TRUE, mat_p)
-        # ======= PROJECTION MATRIX END ==========
-        
-        
-        # Each Item knows how to draw() itself (see step 3 in comment above)
-        for key, obj in self.items.items():
-            obj.draw()
+        for key, prog in self.programs.items():
+            glUseProgram(prog)
+            
+            # ======= VIEW MATRIX BEGIN ==========
+            # rotate and translate the View matrix by mouse controlled vectors
+            mat_v = QMatrix4x4() # start with a unity matrix
+            
+            # the order of translate and rotate is significant!
+            # here we do traslate/rotate/translate for subjectively good mouse interaction
+            mat_v.translate(self._translation_vec) # math is done by Qt!
+            mat_v.rotate(self._rotation_quat) # math is done by Qt!
+            mat_v.translate(self._translation_vec) # math is done by Qt!
+            
+            
+            mat_v = Item.qt_mat_to_array(mat_v) # Transform Qt object to Python list
+            
+            # make the View matrix accessible to the vertex shader as the variable name "mat_v"
+            loc_mat_v = glGetUniformLocation(prog, "mat_v")
+            # copy the data into the "mat_v" GPU variable
+            glUniformMatrix4fv(loc_mat_v, 1, GL_TRUE, mat_v)
+            # ======= PROJECTION MATRIX END ==========
+            
+            
+            # ======= PROJECTION MATRIX BEGIN ==========
+            # calculate the aspect ratio of the window
+            
+            mat_p = QMatrix4x4() # start with a unity matrix
+            mat_p.perspective(90, self.aspect, 0.1, 100000) # math is done by Qt!
+            
+            mat_p = Item.qt_mat_to_array(mat_p) #Transform Qt object to Python list
+            
+            # make the View matrix accessible to the vertex shader as the variable name "mat_p"
+            loc_mat_p = glGetUniformLocation(prog, "mat_p")
+            # copy the data into the "mat_p" GPU variable
+            glUniformMatrix4fv(loc_mat_p, 1, GL_TRUE, mat_p)
+            # ======= PROJECTION MATRIX END ==========
+            
+            
+            # Each Item knows how to draw() itself (see step 3 in comment above)
+            for key, item in self.items.items():
+                if item.program == prog:
+                    item.draw()
       
         # Swapping the OpenGL buffer is done automatically by Qt.
-        # Thanks go to the Qt project!
 
 
     def resizeGL(self, width, height):
@@ -380,11 +387,12 @@ class PainterWidget(QGLWidget):
             self.dirty = False
     
     
-    def item_create(self, class_name, label, *args):
+    def item_create(self, class_name, label, program_name, *args):
         if not label in self.items:
             # create
+            prog = self.programs[program_name]
             klss = self.str_to_class(class_name)
-            item = klss(label, self.gl_program, *args)
+            item = klss(label, prog, *args)
             self.items[label] = item
         else:
             item = self.items[label]
