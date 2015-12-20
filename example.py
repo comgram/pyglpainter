@@ -77,10 +77,12 @@ def main():
     # Create an arbitrary filled triangle with smooth colors
     vertexcount = 3
     mytriangle1 = painter.item_create("Item", "mytriangle1", "simple3d", vertexcount, GL_TRIANGLES, False, 4)
-    mytriangle1.append((300,100,1), (0.2, 0.7, 0.2, 1))
-    mytriangle1.append((350,150,1), (0.7, 0.2, 0.2, 1))
-    mytriangle1.append((420,150,1), (0.2, 0.2, 0.7, 1))
+    mytriangle1.append((0,0,1), (0.2, 0.7, 0.2, 1))
+    mytriangle1.append((0,50,1), (0.7, 0.2, 0.2, 1))
+    mytriangle1.append((50,50,1), (0.2, 0.2, 0.7, 1))
+    mytriangle1.set_origin((350, 100, 0))
     mytriangle1.upload()
+    
     
     # Create an arbitrary filled triangle with smooth colors
     vertexcount = 4
@@ -107,8 +109,8 @@ def main():
     mystar1.set_origin((50,50,50))
     mystar2.set_scale(100)
     
-    mygcode1.highlight_line(2)
-    mygcode1.draw()
+    #mygcode1.highlight_line(2)
+    #mygcode1.draw()
     
     
     # ===== DELETE ITEMS (OPTIONAL) =====

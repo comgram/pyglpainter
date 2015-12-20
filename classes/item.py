@@ -6,7 +6,7 @@ import math
 import re
 
 from PyQt5.QtCore import pyqtSignal, QPoint, Qt, QSize, QTimer
-from PyQt5.QtGui import QColor, QMatrix4x4, QVector2D, QVector3D, QQuaternion
+from PyQt5.QtGui import QColor, QMatrix4x4, QVector2D, QVector3D, QVector4D, QQuaternion
 from PyQt5.QtOpenGL import QGLWidget
 
 import OpenGL
@@ -31,7 +31,7 @@ class Item():
         self.scale = 1
         self.origin = QVector3D(0, 0, 0)
         self.rotation_angle = 0
-        self.rotation_vector = QVector3D(0, 0, 0)
+        self.rotation_vector = QVector3D(0, 1, 0)
         
         self.dirty = True
         
@@ -107,13 +107,20 @@ class Item():
         self.origin = QVector3D(tpl[0], tpl[1], tpl[2])
 
         
-    def draw(self):
+    def draw(self, viewmatrix):
         # upload Model Matrix
-        # TODO: only draw if dirty
         mat_m = QMatrix4x4()
-        mat_m.translate(self.origin)
         mat_m.scale(self.scale)
         mat_m.rotate(self.rotation_angle, self.rotation_vector)
+        mat_m.translate(self.origin)
+        
+        if self.label == "mytriangle1":
+            viewmatrix_inv = viewmatrix.inverted()[0]
+            camera_vec = viewmatrix_inv * QVector4D(0,0,1,0)
+            print(QVector3D(camera_vec[0], camera_vec[1], camera_vec[2]))
+            #mat_m = QMatrix4x4()
+            mat_m.lookAt(QVector3D(0, 0, 0), QVector3D(camera_vec[0], camera_vec[1], camera_vec[2]), QVector3D(0,1,1))
+            mat_m.rotate(180, self.rotation_vector)
         
         if self.filled:
             glPolygonMode( GL_FRONT_AND_BACK, GL_FILL )
@@ -289,7 +296,7 @@ class GcodePath(Item):
         pass
         
         
-    def draw(self):
+    def draw(self, viewmatrix):
         for line_number in self.highlight_lines_queue:
             #print("highlighting line", line_number)
             stride = self.data.strides[0]
@@ -305,8 +312,8 @@ class GcodePath(Item):
             glBufferSubData(GL_ARRAY_BUFFER, offset, color_size, col)
             
         del self.highlight_lines_queue[:]
-        
-        super(GcodePath, self).draw()
+
+        super(GcodePath, self).draw(viewmatrix)
         
         
     def render(self):

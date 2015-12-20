@@ -6,6 +6,8 @@ import sys
 import math
 import os
 
+from PyQt5.QtGui import QColor, QMatrix4x4, QVector2D, QVector3D, QVector4D, QQuaternion
+
 import OpenGL
 OpenGL.ERROR_CHECKING = True
 OpenGL.FULL_LOGGING = True
@@ -185,7 +187,7 @@ class PainterWidget(QGLWidget):
             mat_v.rotate(self._rotation_quat) # math is done by Qt!
             mat_v.translate(self._translation_vec) # math is done by Qt!
             
-            
+            mat_v_orig = mat_v # items need to know the current view matrix
             mat_v = Item.qt_mat_to_array(mat_v) # Transform Qt object to Python list
             
             # make the View matrix accessible to the vertex shader as the variable name "mat_v"
@@ -213,7 +215,7 @@ class PainterWidget(QGLWidget):
             # Each Item knows how to draw() itself (see step 3 in comment above)
             for key, item in self.items.items():
                 if item.program == prog:
-                    item.draw()
+                    item.draw(mat_v_orig)
       
         # Swapping the OpenGL buffer is done automatically by Qt.
 
