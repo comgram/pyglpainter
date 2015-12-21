@@ -116,11 +116,23 @@ class Item():
         
         if self.label == "mytriangle1":
             viewmatrix_inv = viewmatrix.inverted()[0]
-            camera_vec = viewmatrix_inv * QVector4D(0,0,1,0)
-            print(QVector3D(viewmatrix_inv * QVector4D(0,0,0,1))
-            #mat_m = QMatrix4x4()
-            mat_m.lookAt(QVector3D(0, 0, 0), QVector3D(camera_vec[0], camera_vec[1], camera_vec[2]), QVector3D(0,1,1))
+            camvec4d = viewmatrix_inv * QVector4D(0,0,1,0)
+            campos4d = viewmatrix_inv * QVector4D(0,0,0,1)
+            myorig3d = QVector3D(self.origin[0], self.origin[1], self.origin[2])
+            mycampos3d = QVector3D(campos4d[0], campos4d[1], campos4d[2])
+            mycamvec3d = QVector3D(camvec4d[0], camvec4d[1], camvec4d[2])
+            
+            #print(camvec, campos)
+            
+            mat_m = QMatrix4x4()
+            mat_m.lookAt(QVector3D(0,0,0), mycamvec3d, QVector3D(0,1,1))
             mat_m.rotate(180, self.rotation_vector)
+            
+            
+            #print(mycampos3d)
+            #mat_m.lookAt(mycampos3d, myorig3d, QVector3D(0,0,1))
+            
+            
         
         if self.filled:
             glPolygonMode( GL_FRONT_AND_BACK, GL_FILL )
