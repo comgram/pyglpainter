@@ -81,7 +81,7 @@ def main():
     mytriangle1.append((0,0,1), (0.2, 0.7, 0.2, 1))
     mytriangle1.append((0,50,1), (0.7, 0.2, 0.2, 1))
     mytriangle1.append((50,50,1), (0.2, 0.2, 0.7, 1))
-    #mytriangle1.set_origin((350, 100, 0))
+    mytriangle1.set_origin((350, 100, 0))
     mytriangle1.upload()
     
     

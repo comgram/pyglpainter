@@ -110,46 +110,8 @@ class Item():
         
     def draw(self, viewmatrix):
         # upload Model Matrix
-        mat_m = QMatrix4x4()
-        mat_m.scale(self.scale)
+        mat_m = self.calculate_model_matrix(viewmatrix)
 
-        if self.billboard:
-            viewmatrix_inv = viewmatrix.inverted()[0]
-            camvec4d = viewmatrix_inv * QVector4D(0,0,1,0)
-            campos4d = viewmatrix_inv * QVector4D(0,0,0,1)
-            myorig3d = QVector3D(self.origin[0], self.origin[1], self.origin[2])
-            mycampos3d = QVector3D(campos4d[0], campos4d[1], campos4d[2])
-            mycamvec3d = QVector3D(camvec4d[0], camvec4d[1], camvec4d[2])
-            
-            angle_between = Item.angle_between(mycampos3d, QVector3D(0, 0, 1))
-            angle_between = angle_between / (2*3.1415) * 365
-            
-            rotation_axis = QVector3D.crossProduct(
-                QVector3D(0, 0, 1),
-                mycampos3d)
-            
-            q = QQuaternion.fromAxisAndAngle(rotation_axis, angle_between)
-            q.normalize()
-            
-            print("CAM x{:03.1f}y{:03.1f}z{:03.1f}  ROT x{:03.1f}y{:03.1f}z{:03.1f} A{:03.1f}".format(mycampos3d[0], mycampos3d[1], mycampos3d[2], rotation_axis[0], rotation_axis[1], rotation_axis[2], angle_between))
-            
-            mat_m = QMatrix4x4()
-          
-            #mat_m.lookAt(QVector3D(0,0,0), mycamvec3d, QVector3D(0,1,1))
-            #mat_m.rotate(180, self.rotation_vector)
-            
-            mat_m.rotate(q)
-            
-            #print(mycampos3d)
-            #mat_m.lookAt(mycampos3d, myorig3d, QVector3D(0,0,1))
-        else:
-            mat_m.rotate(self.rotation_angle, self.rotation_vector)
-        
-        mat_m.translate(self.origin)
-            
-        
-            
-        
         if self.filled:
             glPolygonMode( GL_FRONT_AND_BACK, GL_FILL )
         else:
@@ -174,6 +136,47 @@ class Item():
         glBindVertexArray(0)
         
         self.dirty = False
+        
+        
+    def calculate_model_matrix(self, viewmatrix):
+        mat_m = QMatrix4x4()
+        mat_m.scale(self.scale)
+        mat_m.translate(self.origin)
+        if self.billboard:
+            viewmatrix_inv = viewmatrix.inverted()[0]
+            
+            camup_qv4d = viewmatrix_inv * QVector4D(0,1,0,0)
+            camup_qv3d = QVector3D(camup_qv4d[0], camup_qv4d[1], camup_qv4d[2])
+            
+            camlook_qv4d = viewmatrix_inv * QVector4D(0,0,1,0)
+            camvec_qv3d = QVector3D(camlook_qv4d[0], camlook_qv4d[1], camlook_qv4d[2])
+            
+            # calculate absolute (world/view) camera position
+            campos_abs_qv4d = viewmatrix_inv * QVector4D(0,0,0,1)
+            campos_abs_qv3d = QVector3D(campos_abs_qv4d[0], campos_abs_qv4d[1], campos_abs_qv4d[2])
+            
+            # calculate relative (model) camera position
+            campos_rel_qv3d = campos_abs_qv3d - self.origin
+
+            angle_between = Item.angle_between(campos_rel_qv3d, QVector3D(0, 0, 1))
+            angle_between = angle_between / (2*3.1415) * 360
+            
+            rotation_axis = QVector3D.crossProduct(QVector3D(0, 0, 1), campos_rel_qv3d)
+            
+            q = QQuaternion.fromAxisAndAngle(rotation_axis, angle_between)
+            q.normalize()
+            
+            print("CAMUP x{:03.3f}y{:03.3f}z{:03.3f}  |  CAMPOS_ABS x{:03.1f}y{:03.1f}z{:03.1f}  |  CAMPOS_REL x{:03.1f}y{:03.1f}z{:03.1f}  |  ROT x{:03.1f}y{:03.1f}z{:03.1f} A{:03.1f}".format(camup_qv4d[0], camup_qv4d[1], camup_qv4d[2], campos_abs_qv3d[0], campos_abs_qv3d[1], campos_abs_qv3d[2], campos_rel_qv3d[0], campos_rel_qv3d[1], campos_rel_qv3d[2], rotation_axis[0], rotation_axis[1], rotation_axis[2], angle_between))
+            
+            mat_m.rotate(q)
+            mat_m.rotate(180, QVector3D(0, 0, 1))
+        else:
+            mat_m.rotate(self.rotation_angle, self.rotation_vector)
+        
+        
+        return mat_m
+        
+        
     
     @staticmethod
     def qt_mat_to_array(mat):
