@@ -27,7 +27,9 @@ class Item():
         self.linewidth = line_width
         
         self.filled = filled
+        
         self.billboard = False
+        self.billboard_axis = None
         
         self.scale = 1
         self.origin = QVector3D(0, 0, 0)
@@ -105,10 +107,10 @@ class Item():
         
         
     def set_origin(self, tpl):
-        self.origin = QVector3D(tpl[0], tpl[1], tpl[2])
+        self.origin = QVector3D(*tpl)
 
         
-    def draw(self, viewmatrix):
+    def draw(self, viewmatrix=None):
         # upload Model Matrix
         mat_m = self.calculate_model_matrix(viewmatrix)
 
@@ -138,41 +140,82 @@ class Item():
         self.dirty = False
         
         
-    def calculate_model_matrix(self, viewmatrix):
+    def calculate_model_matrix(self, viewmatrix=None):
         mat_m = QMatrix4x4()
-        mat_m.scale(self.scale)
         mat_m.translate(self.origin)
+        
         if self.billboard:
+            # based on excellent tutorial:
+            # http://nehe.gamedev.net/article/billboarding_how_to/18011/
+            
+            # transform camera-centric coordinates back to world-centric coordinates
             viewmatrix_inv = viewmatrix.inverted()[0]
             
-            camup_qv4d = viewmatrix_inv * QVector4D(0,1,0,0)
-            camup_qv3d = QVector3D(camup_qv4d[0], camup_qv4d[1], camup_qv4d[2])
+            # extract 2nd column which is camera up vector
+            cam_up = viewmatrix_inv * QVector4D(0,1,0,0)
+            cam_up = QVector3D(cam_up[0], cam_up[1], cam_up[2])
+            cam_up.normalize()
             
-            camlook_qv4d = viewmatrix_inv * QVector4D(0,0,1,0)
-            camvec_qv3d = QVector3D(camlook_qv4d[0], camlook_qv4d[1], camlook_qv4d[2])
+            # extract 3rd column which is camera look vector
+            cam_look = viewmatrix_inv * QVector4D(0,0,1,0)
+            cam_look = QVector3D(cam_look[0], cam_look[1], cam_look[2])
+            cam_look.normalize()
             
-            # calculate absolute (world/view) camera position
-            campos_abs_qv4d = viewmatrix_inv * QVector4D(0,0,0,1)
-            campos_abs_qv3d = QVector3D(campos_abs_qv4d[0], campos_abs_qv4d[1], campos_abs_qv4d[2])
+            # extract 4th column which is camera position
+            cam_pos = viewmatrix_inv * QVector4D(0,0,0,1)
+            cam_pos = QVector3D(cam_pos[0], cam_pos[1], cam_pos[2])
             
-            # calculate relative (model) camera position
-            campos_rel_qv3d = campos_abs_qv3d - self.origin
-
-            angle_between = Item.angle_between(campos_rel_qv3d, QVector3D(0, 0, 1))
-            angle_between = angle_between / (2*3.1415) * 360
+            # calculate self look vector (self to camera)
+            bill_look = cam_pos - self.origin
+            bill_look.normalize()
             
-            rotation_axis = QVector3D.crossProduct(QVector3D(0, 0, 1), campos_rel_qv3d)
+            if self.billboard_axis == None:
+                # Fully aligned billboard
+                # calculate new self right vector based upon self look and camera up
+                bill_right = QVector3D.crossProduct(cam_up, bill_look)
+                
+                # calculate self up vector based on self look and self right
+                bill_up = QVector3D.crossProduct(bill_look, bill_right)
+                
+            else:
+                axis_words = ["X", "Y", "Z"]
+                axis = axis_words.index(self.billboard_axis)
+                
+                bill_up = [0]*3
+                for i in range(0,3):
+                    bill_up[i] = 1 if i == axis else 0
+                bill_up = QVector3D(*bill_up)
+                
+                bill_look_zeroed = [0]*3
+                for i in range(0,3):
+                    bill_look_zeroed[i] = 0 if i == axis else bill_look[i]
+                bill_look = QVector3D(*bill_look_zeroed)
+                bill_look.normalize()
+                
+                bill_right = QVector3D.crossProduct(bill_up, bill_look)
             
-            q = QQuaternion.fromAxisAndAngle(rotation_axis, angle_between)
-            q.normalize()
+            # view and model matrices are actually nicely structured
+            # 1st column: right vector
+            # 2nd column: up vector
+            # 3rd column: look vector
+            # 4th column: position
+            # here we only overwrite right, up and look. Position is already there.
+            mat_m[0,0] = bill_right[0]
+            mat_m[1,0] = bill_right[1]
+            mat_m[2,0] = bill_right[2]
             
-            print("CAMUP x{:03.3f}y{:03.3f}z{:03.3f}  |  CAMPOS_ABS x{:03.1f}y{:03.1f}z{:03.1f}  |  CAMPOS_REL x{:03.1f}y{:03.1f}z{:03.1f}  |  ROT x{:03.1f}y{:03.1f}z{:03.1f} A{:03.1f}".format(camup_qv4d[0], camup_qv4d[1], camup_qv4d[2], campos_abs_qv3d[0], campos_abs_qv3d[1], campos_abs_qv3d[2], campos_rel_qv3d[0], campos_rel_qv3d[1], campos_rel_qv3d[2], rotation_axis[0], rotation_axis[1], rotation_axis[2], angle_between))
+            mat_m[0,1] = bill_up[0]
+            mat_m[1,1] = bill_up[1]
+            mat_m[2,1] = bill_up[2]
             
-            mat_m.rotate(q)
-            mat_m.rotate(180, QVector3D(0, 0, 1))
+            mat_m[0,2] = bill_look[0]
+            mat_m[1,2] = bill_look[1]
+            mat_m[2,2] = bill_look[2]
+            
         else:
             mat_m.rotate(self.rotation_angle, self.rotation_vector)
         
+        mat_m.scale(self.scale)
         
         return mat_m
         
@@ -331,7 +374,7 @@ class GcodePath(Item):
         pass
         
         
-    def draw(self, viewmatrix):
+    def draw(self, viewmatrix=None):
         for line_number in self.highlight_lines_queue:
             #print("highlighting line", line_number)
             stride = self.data.strides[0]

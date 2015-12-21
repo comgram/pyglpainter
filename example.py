@@ -74,15 +74,31 @@ def main():
     mylines2.append((230,100,1), color)
     mylines2.upload()
     
-    # Create an arbitrary filled triangle with smooth colors
-    vertexcount = 3
-    mytriangle1 = painter.item_create("Item", "mytriangle1", "simple3d", vertexcount, GL_TRIANGLES, False, 4)
-    mytriangle1.billboard = True
-    mytriangle1.append((0,0,1), (0.2, 0.7, 0.2, 1))
-    mytriangle1.append((0,50,1), (0.7, 0.2, 0.2, 1))
-    mytriangle1.append((50,50,1), (0.2, 0.2, 0.7, 1))
-    mytriangle1.set_origin((350, 100, 0))
-    mytriangle1.upload()
+    # Create a fully aligned billboard
+    vertexcount = 4
+    myquad1 = painter.item_create("Item", "myquad1", "simple3d", vertexcount, GL_TRIANGLE_STRIP, False, 2)
+    myquad1.billboard = True
+    myquad1.billboard_axis = None
+    col = (0.2, 0.7, 0.2, 1)
+    myquad1.append((0,0,0), col)
+    myquad1.append((0,50,0), col)
+    myquad1.append((50,0,0), col)
+    myquad1.append((50,50,0), col)
+    myquad1.set_origin((350, 100, 0))
+    myquad1.upload()
+    
+    # Create a Z-axis aligned billboard
+    vertexcount = 4
+    myquad2 = painter.item_create("Item", "myquad2", "simple3d", vertexcount, GL_TRIANGLE_STRIP, False, 2)
+    myquad2.billboard = True
+    myquad2.billboard_axis = "Z"
+    col = (0.7, 0.2, 0.7, 1)
+    myquad2.append((0,0,0), col)
+    myquad2.append((0,50,0), col)
+    myquad2.append((50,0,0), col)
+    myquad2.append((50,50,0), col)
+    myquad2.set_origin((350, 200, 0))
+    myquad2.upload()
     
     
     # Create an arbitrary filled triangle with smooth colors
@@ -110,8 +126,8 @@ def main():
     mystar1.set_origin((50,50,50))
     mystar2.set_scale(100)
     
-    #mygcode1.highlight_line(2)
-    #mygcode1.draw()
+    mygcode1.highlight_line(2)
+    mygcode1.draw()
     
     
     # ===== DELETE ITEMS (OPTIONAL) =====
