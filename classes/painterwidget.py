@@ -183,7 +183,7 @@ class PainterWidget(QGLWidget):
             
             # the order of translate and rotate is significant!
             # here we do traslate/rotate/translate for subjectively good mouse interaction
-            #mat_v.translate(self._translation_vec) # math is done by Qt!
+            mat_v.translate(self._translation_vec) # math is done by Qt!
             mat_v.rotate(self._rotation_quat) # math is done by Qt!
             mat_v.translate(self._translation_vec) # math is done by Qt!
             
