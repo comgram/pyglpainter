@@ -128,7 +128,7 @@ class Item():
                 QVector3D(0, 0, 1),
                 mycampos3d)
             
-            q = QQuaternion.fromAxisAndAngle(mycampos3d, angle_between)
+            q = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), angle_between)
             q.normalize()
             
             print("CAM x{:03.1f}y{:03.1f}z{:03.1f}  ROT x{:03.1f}y{:03.1f}z{:03.1f} A{:03.1f}".format(mycampos3d[0], mycampos3d[1], mycampos3d[2], rotation_axis[0], rotation_axis[1], rotation_axis[2], angle_between))
