@@ -9,6 +9,8 @@ from PyQt5.QtCore import pyqtSignal, QPoint, Qt, QSize, QTimer
 from PyQt5.QtGui import QColor, QMatrix4x4, QVector2D, QVector3D, QVector4D, QQuaternion
 from PyQt5.QtOpenGL import QGLWidget
 
+import lib.font_dutch_blunt as font
+
 import OpenGL
 OpenGL.ERROR_CHECKING = True
 OpenGL.FULL_LOGGING = True
@@ -334,6 +336,54 @@ class Grid(Item):
             self.append((0, y, 0), self.color)
             self.append((width, y, 0), self.color)
 
+        self.upload()
+        
+        
+class Text(Item):
+    def __init__(self, label, prog, txt):
+        
+        charnum = len(txt)
+        
+        firstcharidx = 24
+        
+        vertexcount_total = 0
+        for char in txt:
+            j = ord(char) - firstcharidx
+            #if j < 33 or j > 127: continue # this includes \n but reserving a few bytes more doesn't matter
+            vertexcount_total += font.sizes[j]
+            
+        super(Text, self).__init__(label, prog, vertexcount_total, GL_TRIANGLES, True)
+        
+        letterpos = 0
+        letterspacing = 1
+        linepos = 0
+        linespacing = 6
+        
+        col = (1, 1, 1, 0.6)
+        
+        for char in txt:
+            j = ord(char) - firstcharidx
+            
+            if char == "\n":
+                linepos -= linespacing
+                letterpos = 0
+                
+                continue
+            
+            vertexcount = font.sizes[j] * 2
+            offset = font.vdataoffsets[j] * 2
+            for i in range(offset, offset + vertexcount, 2):
+                x = font.vdata[i]
+                y = font.vdata[i + 1]
+                w = font.widths[j]
+                
+                x += letterpos
+                y += linepos
+                self.append((x, y, 0), col)
+            letterpos += w
+            letterpos += letterspacing
+                
+                
         self.upload()
         
         

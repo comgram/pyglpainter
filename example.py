@@ -38,6 +38,12 @@ def main():
     mystar2 = painter.item_create("Star", "mystar2", "simple3d", 15, (100, 100, 10))
     
     
+    mytext1 = painter.item_create("Text", "mytext1", "simple3d", "G54")
+    mytext1.billboard = True
+    mytext1.set_origin((400, 400, 0))
+    mytext1.set_scale(7)
+    
+    
     # Plot CNC G-code relative to mycs2 ------------------------
     gcodes = []
     gcodes.append("G0 X20 Y20")
