@@ -27,6 +27,7 @@ class Item():
         self.linewidth = line_width
         
         self.filled = filled
+        self.billboard = False
         
         self.scale = 1
         self.origin = QVector3D(0, 0, 0)
@@ -111,10 +112,8 @@ class Item():
         # upload Model Matrix
         mat_m = QMatrix4x4()
         mat_m.scale(self.scale)
-        mat_m.rotate(self.rotation_angle, self.rotation_vector)
-        mat_m.translate(self.origin)
-        
-        if self.label == "mytriangle1":
+
+        if self.billboard:
             viewmatrix_inv = viewmatrix.inverted()[0]
             camvec4d = viewmatrix_inv * QVector4D(0,0,1,0)
             campos4d = viewmatrix_inv * QVector4D(0,0,0,1)
@@ -122,16 +121,30 @@ class Item():
             mycampos3d = QVector3D(campos4d[0], campos4d[1], campos4d[2])
             mycamvec3d = QVector3D(camvec4d[0], camvec4d[1], camvec4d[2])
             
-            #print(camvec, campos)
+            angle_between = Item.angle_between(mycampos3d, QVector3D(0, 0, 1))
+            angle_between = angle_between / (2*3.1415) * 365
+            
+            rotation_axis = QVector3D.crossProduct(
+                QVector3D(0, 0, 1),
+                mycampos3d)
+            
+            q = QQuaternion.fromAxisAndAngle(rotation_axis, angle_between)
+            q.normalize()
+            
+            print("CAM x{:03.1f}y{:03.1f}z{:03.1f}  ROT x{:03.1f}y{:03.1f}z{:03.1f} A{:03.1f}".format(mycampos3d[0], mycampos3d[1], mycampos3d[2], rotation_axis[0], rotation_axis[1], rotation_axis[2], angle_between))
             
             mat_m = QMatrix4x4()
-            mat_m.lookAt(QVector3D(0,0,0), mycamvec3d, QVector3D(0,1,1))
-            mat_m.rotate(180, self.rotation_vector)
+            #mat_m.lookAt(QVector3D(0,0,0), mycamvec3d, QVector3D(0,1,1))
+            #mat_m.rotate(180, self.rotation_vector)
+            mat_m.rotate(q)
             
             
             #print(mycampos3d)
             #mat_m.lookAt(mycampos3d, myorig3d, QVector3D(0,0,1))
+        else:
+            mat_m.rotate(self.rotation_angle, self.rotation_vector)
             
+        mat_m.translate(self.origin)
             
         
         if self.filled:
@@ -167,6 +180,10 @@ class Item():
                 idx = 4 * i + j
                 arr[idx] = mat[i, j]
         return arr
+    
+    @staticmethod
+    def angle_between(v1, v2):
+        return math.acos(QVector3D.dotProduct(v1, v2) / (v1.length() * v2.length()))
         
         
         
@@ -426,4 +443,3 @@ class GcodePath(Item):
             # generate 2 line segments per gcode for sharper color transitions when using spindle speed
             self.append(start + diff * 0.001, col)
             self.append(start + diff, (col[0], col[1], col[2], 0.3))
-            

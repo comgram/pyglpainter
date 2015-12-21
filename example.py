@@ -77,10 +77,11 @@ def main():
     # Create an arbitrary filled triangle with smooth colors
     vertexcount = 3
     mytriangle1 = painter.item_create("Item", "mytriangle1", "simple3d", vertexcount, GL_TRIANGLES, False, 4)
+    mytriangle1.billboard = True
     mytriangle1.append((0,0,1), (0.2, 0.7, 0.2, 1))
     mytriangle1.append((0,50,1), (0.7, 0.2, 0.2, 1))
     mytriangle1.append((50,50,1), (0.2, 0.2, 0.7, 1))
-    mytriangle1.set_origin((350, 100, 0))
+    #mytriangle1.set_origin((350, 100, 0))
     mytriangle1.upload()
     
     
