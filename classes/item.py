@@ -117,7 +117,7 @@ class Item():
         if self.label == "mytriangle1":
             viewmatrix_inv = viewmatrix.inverted()[0]
             camera_vec = viewmatrix_inv * QVector4D(0,0,1,0)
-            print(QVector3D(camera_vec[0], camera_vec[1], camera_vec[2]))
+            print(QVector3D(viewmatrix_inv * QVector4D(0,0,0,1))
             #mat_m = QMatrix4x4()
             mat_m.lookAt(QVector3D(0, 0, 0), QVector3D(camera_vec[0], camera_vec[1], camera_vec[2]), QVector3D(0,1,1))
             mat_m.rotate(180, self.rotation_vector)
