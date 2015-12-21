@@ -128,23 +128,26 @@ class Item():
                 QVector3D(0, 0, 1),
                 mycampos3d)
             
-            q = QQuaternion.fromAxisAndAngle(rotation_axis, angle_between)
+            q = QQuaternion.fromAxisAndAngle(QVector3D(1, 0, 0), angle_between)
             q.normalize()
             
             print("CAM x{:03.1f}y{:03.1f}z{:03.1f}  ROT x{:03.1f}y{:03.1f}z{:03.1f} A{:03.1f}".format(mycampos3d[0], mycampos3d[1], mycampos3d[2], rotation_axis[0], rotation_axis[1], rotation_axis[2], angle_between))
             
             mat_m = QMatrix4x4()
+          
             #mat_m.lookAt(QVector3D(0,0,0), mycamvec3d, QVector3D(0,1,1))
             #mat_m.rotate(180, self.rotation_vector)
-            mat_m.rotate(q)
             
+            mat_m.rotate(q)
             
             #print(mycampos3d)
             #mat_m.lookAt(mycampos3d, myorig3d, QVector3D(0,0,1))
         else:
             mat_m.rotate(self.rotation_angle, self.rotation_vector)
-            
+        
         mat_m.translate(self.origin)
+            
+        
             
         
         if self.filled:
