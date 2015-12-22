@@ -57,8 +57,11 @@ or as a visualization backend for production-class applications.
 ## Mouse Navigation
 
 Left Button drag left/right/up/down: Rotate camera left/right/up/down
+
 Middle Button drag left/right/up/down: Move camera left/right/up/down
+
 Wheel rotate up/down: Move camera ahead/back
+
 Right Button drag up/down: Move camera ahead/back (same as wheel)
 
 The FOV (Field of View) is held constant. "Zooming" is rather moving
