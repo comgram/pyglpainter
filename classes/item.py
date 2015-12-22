@@ -142,16 +142,13 @@ class Item():
         self.dirty = False
         
         
-    def calculate_model_matrix(self, viewmatrix=None):
+    def calculate_model_matrix(self, viewmatrix_inv=None):
         mat_m = QMatrix4x4()
         mat_m.translate(self.origin)
         
         if self.billboard:
             # based on excellent tutorial:
             # http://nehe.gamedev.net/article/billboarding_how_to/18011/
-            
-            # transform camera-centric coordinates back to world-centric coordinates
-            viewmatrix_inv = viewmatrix.inverted()[0]
             
             # extract 2nd column which is camera up vector
             cam_up = viewmatrix_inv * QVector4D(0,1,0,0)

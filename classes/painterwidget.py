@@ -55,8 +55,14 @@ class PainterWidget(QGLWidget):
         self._translation_vec = QVector3D(-150, -150, -350) # looking down the Z axis
         self._translation_vec_start = self._translation_vec
         
+        self._mat_v_inverted = QMatrix4x4()
+        self._cam_look = QVector3D()
+        self._cam_pos = QVector3D()
+        
         # Setup inital Zoom state
-        self._zoom = 3
+        self._fov = 90
+        
+        self._mouse_fov_start = 0
 
         # The width and height of the window. resizeGL() will set them.
         self.width = None
@@ -183,12 +189,26 @@ class PainterWidget(QGLWidget):
             
             # the order of translate and rotate is significant!
             # here we do traslate/rotate/translate for subjectively good mouse interaction
-            mat_v.translate(self._translation_vec) # math is done by Qt!
+            #mat_v.translate(self._translation_vec) # math is done by Qt!
             mat_v.rotate(self._rotation_quat) # math is done by Qt!
+            
             mat_v.translate(self._translation_vec) # math is done by Qt!
             
-            mat_v_orig = mat_v # items need to know the current view matrix
+            self._mat_v_inverted = mat_v.inverted()[0] # items need to know the current view matrix
             mat_v = Item.qt_mat_to_array(mat_v) # Transform Qt object to Python list
+            
+            cam_right = self._mat_v_inverted * QVector4D(1,0,0,0)
+            self.cam_right = QVector3D(cam_right[0], cam_right[1], cam_right[2])
+            
+            cam_up = self._mat_v_inverted * QVector4D(0,1,0,0)
+            self.cam_up = QVector3D(cam_up[0], cam_up[1], cam_up[2])
+            
+            cam_look = self._mat_v_inverted * QVector4D(0,0,1,0)
+            self._cam_look = QVector3D(cam_look[0], cam_look[1], cam_look[2])
+            
+            # extract 4th column which is camera position
+            cam_pos = self._mat_v_inverted * QVector4D(0,0,0,1)
+            self._cam_pos = QVector3D(cam_pos[0], cam_pos[1], cam_pos[2])
             
             # make the View matrix accessible to the vertex shader as the variable name "mat_v"
             loc_mat_v = glGetUniformLocation(prog, "mat_v")
@@ -201,7 +221,7 @@ class PainterWidget(QGLWidget):
             # calculate the aspect ratio of the window
             
             mat_p = QMatrix4x4() # start with a unity matrix
-            mat_p.perspective(90, self.aspect, 0.1, 100000) # math is done by Qt!
+            mat_p.perspective(self._fov, self.aspect, 0.1, 100000) # math is done by Qt!
             
             mat_p = Item.qt_mat_to_array(mat_p) #Transform Qt object to Python list
             
@@ -215,7 +235,7 @@ class PainterWidget(QGLWidget):
             # Each Item knows how to draw() itself (see step 3 in comment above)
             for key, item in self.items.items():
                 if item.program == prog:
-                    item.draw(mat_v_orig)
+                    item.draw(self._mat_v_inverted)
       
         # Swapping the OpenGL buffer is done automatically by Qt.
 
@@ -246,7 +266,14 @@ class PainterWidget(QGLWidget):
             self._rotation_quat_start = self._rotation_quat
             
         elif btns & (Qt.MidButton):
-            self._mouse_translation_vec_current = QVector3D(x, -y, 0)
+            self._mouse_translation_start_vec = QVector3D(x, y, 0)
+            self._translation_vec_start = self._translation_vec
+            
+        elif btns & (Qt.RightButton):
+            #self._mouse_fov_start = x
+            #self._fov_start = self._fov
+            
+            self._mouse_camforward_start = y
             self._translation_vec_start = self._translation_vec
         
         
@@ -256,24 +283,8 @@ class PainterWidget(QGLWidget):
     def wheelEvent(self, event):
         delta = event.angleDelta().y()
         
-        if delta > 0:
-            # zoom in
-            self._zoom = self._zoom * 1.02
-        else:
-            # zoom out
-            self._zoom = self._zoom * 0.98
-            
-        print("Zoom: {}".format(self._zoom))
-        
-        # We use the zoom value not for actual zooming like a camera, but to
-        # translate the Z axis of the translation vector for the View matrix.
-        # This is, in my opinion, more natural, because in reality you would
-        # translate your eyes towards an object to see more details.
-
-        self._translation_vec = QVector3D(
-            self._translation_vec[0],
-            self._translation_vec[1],
-            self._translation_vec[2] + delta / (2 * self._zoom))
+        # move in look direction of camera
+        self._translation_vec += self._cam_look * delta / 15
         
         # re-paint at the next timer tick
         self.dirty = True
@@ -317,7 +328,21 @@ class PainterWidget(QGLWidget):
             
         elif btns & Qt.MidButton:
             # simple X-Y translation, sensitivity depending on zoom
-            self._translation_vec = self._translation_vec_start + (QVector3D(x, -y, 0) - self._mouse_translation_vec_current) / self._zoom * 2
+            diff = QVector3D(x, y, 0) - self._mouse_translation_start_vec
+            diff_x = diff[0]
+            diff_y = diff[1]
+            
+            self._translation_vec = self._translation_vec_start - self.cam_right * diff_x * 2 + self.cam_up * diff_y * 2
+            
+        elif btns & Qt.RightButton:
+            #diff_x = x - self._mouse_fov_start
+            #self._fov = self._fov_start - diff_x
+            #if self._fov < 3: self._fov = 3
+            #if self._fov > 130: self._fov = 130
+            
+            diff_y = y - self._mouse_camforward_start
+            self._translation_vec = self._translation_vec_start - self._cam_look * diff_y * 2
+            
         
         # re-draw at next timer tick
         self.dirty = True
