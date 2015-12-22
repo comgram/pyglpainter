@@ -1,9 +1,93 @@
-# pyglengine - Python OpenGL Engine
+# pyglpainter - Python OpenGL Painter
 
-Project for minimal OpenGL programming
+(c) 2015 Michael Franzl
 
-Convert Qt .ui file into Python class:
+MIT License (see below for wording)
 
-    pyuic5 qt/mainwindow.ui > qt/ui_mainwindow.py
+## Minimalistic but modern OpenGL drawing for technical applications
+
+This class extends PyQt5's QGLWidget with boilerplate code neccessary
+for applications which want to build a classical orthagnoal 3D world
+in which the user can interactively navigate with the mouse via the
+classical (and expected) Pan-Zoom-Rotate paradigm implemented via a
+virtual trackball (using quaternions for rotations).
+
+This class is especially useful for technical visualizations in 3D
+space. It provides a simple Python API to draw raw OpenGL primitives
+(LINES, LINE_STRIP, TRIANGLES, etc.) as well as a number of useful
+composite primitives rendered by this class itself (Grid, Star,
+CoordSystem, Text, etc., see files in classes/items). As a bonus,
+all objects/items can either be drawn as real 3D world entities which
+optionally support "billboard" mode (fully camera-aligned or arbitrary-
+axis aligned), or as a 2D overlay.
+
+It uses the "modern", shader-based, OpenGL API rather than the
+deprecated "fixed pipeline" and was developed for Python version 3
+and Qt version 5.
+
+Model, View and Projection matrices are calculated on the CPU, and
+then utilized in the GPU.
+
+Qt has been chosen not only because it provides the GL environment
+but also vector, matrix and quaternion math. A port of this Python
+code into native Qt C++ is therefore trivial.
+
+Look at example.py, part of this project, to see how this class can
+be used. If you need more functionality, consider subclassing.
+
+Most of the time, calls to item_create() are enough to build a 3D
+world with interesting objects in it (the name for these objects here
+is "items"). This class supports items with different shaders.
+
+This project was originally created for a CNC application, but then
+extracted from this application and made multi-purpose. The author
+believes it contains the simplest and shortest code to quickly utilize
+the basic and raw powers of OpenGL. To keep code simple and short, the
+project was optimized for technical, line- and triangle based
+primitives, not the realism that game engines strive for. The simple
+shaders included in this project will draw aliased lines and the
+output therefore will look more like computer graphics of the 80's.
+But "modern" OpenGL moves all of the realism algorithms into shaders
+which cannot therefore be part of the CPU application supplying raw
+vertex attributes.
+
+This class can either be used for teaching purposes, experimentation,
+or as a visualization backend for production-class applications.
+
+## Mouse Navigation
+
+Left Button drag left/right/up/down: Rotate camera left/right/up/down
+Middle Button drag left/right/up/down: Move camera left/right/up/down
+Wheel rotate up/down: Move camera ahead/back
+Right Button drag up/down: Move camera ahead/back (same as wheel)
+
+The FOV (Field of View) is held constant. "Zooming" is rather moving
+the camera ahead, which is more natural than changing the FOV of the 
+camera. Even cameras in movies and TV series very, very rarely zoom
+any more.
+
+## Installation
+
+Clone this git repository
+
+Then install some dependencies (tested on Debian Jessie only)
+
+    apt-get install python3-pyqt5 python3-pyqt5.qtopengl
     
-https://swiftcoder.wordpress.com/2008/11/25/constructing-a-billboard-matrix/
+I may have forgotten other dependencies. Please let me know if something is missing.
+
+
+## Example
+
+All features of pyglpainter are shown in an OpenGL window (install dependencies
+first):
+
+    python3 ./example.py
+
+## TODO:
+
+* Turn this project into a standards-compliant Python module/package
+* Circle and Arc compound primitive made up from line segments
+* TRIANGLE_STRIP-based surface compund primitive
+* Support of more OpenGL features (textures, lights, etc.)
+
