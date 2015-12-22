@@ -7,80 +7,136 @@ import math
 import os
 
 from PyQt5.QtGui import QColor, QMatrix4x4, QVector2D, QVector3D, QVector4D, QQuaternion
+from PyQt5.QtOpenGL import QGLWidget
+from PyQt5.QtCore import pyqtSignal, QPoint, Qt, QSize, QTimer
 
 import OpenGL
 OpenGL.ERROR_CHECKING = True
 OpenGL.FULL_LOGGING = True
 from OpenGL.GL import *
 
-from .item import *
+from .items.base_item import BaseItem
+from .items.coord_system import CoordSystem
+from .items.ortho_line_grid import OrthoLineGrid
+from .items.star import Star
+from .items.text import Text
+from .items.gcode_path import GcodePath
 
 
 class PainterWidget(QGLWidget):
     """
-    This Qt Widget implements an OpenGL viewport providing mouse
-    interactivity in the classical zoom-rotate-pan fashion via the
-    trackball (arcball) model, providing reusable 'boilerplate' code
-    neccessary for developing simple to complex OpenGL applications.
+    This class extends PyQt5's QGLWidget with boilerplate code neccessary
+    for applications which want to build a classical orthagnoal 3D world
+    in which the user can interactively navigate with the mouse via the
+    classical (and expected) Pan-Zoom-Rotate paradigm implemented via a
+    virtual trackball (using quaternions for rotations).
     
-    It uses Qt classes rather than Glut because Qt provides
-    many advanced math functions neccessary for convenient mouse
-    interactions involving quaternions.
+    This class is especially useful for technical visualizations in 3D
+    space. It provides a simple Python API to draw raw OpenGL primitives
+    (LINES, LINE_STRIP, TRIANGLES, etc.) as well as a number of useful
+    composite primitives rendered by this class itself (Grid, Star,
+    CoordSystem, Text, etc., see files in classes/items). As a bonus,
+    all objects/items can either be drawn as real 3D world entities which
+    optionally support "billboard" mode (fully camera-aligned or arbitrary-
+    axis aligned), or as a 2D overlay.
     
-    You should create a subclass that draws objects in the OpenGL scene
-    by instantiating objects from the Item class, which is also part
-    of this project.
+    It uses the "modern", shader-based, OpenGL API rather than the
+    deprecated "fixed pipeline" and was developed for Python version 3
+    and Qt version 5.
     
-    This class has been kept as simple and concise as possible, but can
-    nevertheless be the basis of simple as well as advanced OpenGl projects.
+    Model, View and Projection matrices are calculated on the CPU, and
+    then utilized in the GPU.
     
-    It has been developed and tested with Qt5 and Python3 in Debian Jessie.
+    Qt has been chosen not only because it provides the GL environment
+    but also vector, matrix and quaternion math. A port of this Python
+    code into native Qt C++ is therefore trivial.
+    
+    Look at example.py, part of this project, to see how this class can
+    be used. If you need more functionality, consider subclassing.
+    
+    Most of the time, calls to item_create() are enough to build a 3D
+    world with interesting objects in it (the name for these objects here
+    is "items"). This class supports items with different shaders.
+    
+    This project was originally created for a CNC application, but then
+    extracted from this application and made multi-purpose. The author
+    believes it contains the simplest and shortest code to quickly utilize
+    the basic and raw powers of OpenGL. To keep code simple and short, the
+    project was optimized for technical, line- and triangle based
+    primitives, not the realism that game engines strive for. The simple
+    shaders included in this project will draw aliased lines and the
+    output therefore will look more like computer graphics of the 80's.
+    But "modern" OpenGL moves all of the realism algorithms into shaders
+    which cannot therefore be part of the CPU application supplying raw
+    vertex attributes.
+    
+    This class can either be used for teaching purposes, experimentation,
+    or as a visualization backend for production-class applications.
+    
+    Mouse Navigation:
+    
+    Left Button drag left/right/up/down: Rotate camera left/right/up/down
+    Middle Button drag left/right/up/down: Move camera left/right/up/down
+    Wheel rotate up/down: Move camera ahead/back
+    Right Button drag up/down: Move camera ahead/back (same as wheel)
+    
+    The FOV (Field of View) is held constant. "Zooming" is rather moving
+    the camera ahead, which is more natural than changing the FOV of the 
+    camera. Even cameras in movies and TV series very, very rarely zoom
+    any more.
+    
+    TODO:
+    * Circle and Arc compound primitive made up from line segments
+    * TRIANGLE_STRIP-based surface compund primitive
+    * Support of more OpenGL features (textures, lights, etc.)
     """
     
     __version__ = "0.1.0"
     
     def __init__(self, parent=None):
-        """ Initialization of translate, rotate, zoom states.
-        """
         super(PainterWidget, self).__init__(parent)
-        print(glGetString(GL_EXTENSIONS))
         
-        # Setup inital world Rotation state
-        self._mouse_rotation_start_vec = QVector3D()
-        self._rotation_quat = QQuaternion()
-        self._rotation_quat_start = self._rotation_quat
-        self._rotation_axis = QVector3D()
+        self.mat_v = QMatrix4x4() # the current View matrix
+        self.mat_v_inverted = QMatrix4x4() # the current inverse View matrix
         
-        # Setup initial world Translation state
-        self._translation_vec = QVector3D(-150, -150, -350) # looking down the Z axis
-        self._translation_vec_start = self._translation_vec
+        self.mat_p = QMatrix4x4() # the current Projection matrix
         
-        self._mat_v_inverted = QMatrix4x4()
-        self._cam_look = QVector3D()
-        self._cam_pos = QVector3D()
+        self.cam_right = QVector3D() # the current camera right direction
+        self.cam_up = QVector3D() # the current camera up direction
+        self.cam_look = QVector3D() # the current camera look direction
+        self.cam_pos = QVector3D() # the current camera position
         
-        # Setup inital Zoom state
-        self._fov = 90
-        
-        self._mouse_fov_start = 0
+        self.fov = 90 # the current field of view for the projection matrix
 
         # The width and height of the window. resizeGL() will set them.
         self.width = None
         self.height = None
         
-        # Rather than repainting the scene on each mouse event, we repaint at fixed timer intervals.
-        self.dirty = True
-        
-        # Setup our only and main timer
-        self.timer = QTimer()
-        self.timer.timeout.connect(self._timer_timeout)
-
-        self.programs = {}
-        
-        # This will contain all items (3D objects) in the scene
+        # This will contain instances of class Item (objects) in the scene
         self.items = {}
         
+        # Rather than repainting the scene on each mouse event,
+        # we repaint at fixed timer intervals.
+        self.dirty = True
         
+        
+        # Setup our only and main timer
+        self._timer = QTimer()
+        self._timer.timeout.connect(self._timer_timeout)
+
+        # contains OpenGL "programs" of different shaders
+        self._programs = {}
+                
+        # Setup inital world Rotation states
+        self._rotation_quat = QQuaternion() # to rotate the View matrix
+        self._rotation_quat_start = None # state for mouse click
+        self._mouse_rotation_start_vec = None # state for mouse click
+        
+        # Setup initial world Translation states
+        self._translation_vec = QVector3D(-150, -150, -350) # to translate the View matrix
+        self._translation_vec_start = None # state for mouse click
+
+        self._mouse_fov_start = None # state for mouse click
     
 
     def initializeGL(self):
@@ -89,72 +145,122 @@ class PainterWidget(QGLWidget):
         """
         print("initializeGL called")
         
+        # output some useful information
+        print("OPENGL EXTENSIONS", glGetString(GL_EXTENSIONS))
         print("OPENGL VERSION", glGetString(GL_VERSION))
         print("OPENGL VENDOR", glGetString(GL_VENDOR))
         print("OPENGL RENDERER", glGetString(GL_RENDERER))
         print("OPENGL GLSL VERSION", glGetString(GL_SHADING_LANGUAGE_VERSION))
         
-        self.create_program("simple3d", "simple3d-vertex.c", "simple3d-fragment.c")
-        self.create_program("simple2d", "simple2d-vertex.c", "simple2d-fragment.c")
-        #glUseProgram(self.programs["simple3d"])
-        
         # some global OpenGL settings
         glEnable(GL_DEPTH_TEST)
-        glEnable (GL_BLEND)
-        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
         # Try smooth lines. this only works on some GPUs.
         # The only reliable way to have smooth lines nowadays is to 
         # write appropriate shaders for it
-        glEnable (GL_LINE_SMOOTH)
-        glHint (GL_LINE_SMOOTH_HINT, GL_DONT_CARE)
+        glEnable(GL_LINE_SMOOTH)
+        glHint(GL_LINE_SMOOTH_HINT, GL_DONT_CARE)
         
+        # the world background color
         glClearColor(0, 0, 0, 1.0)
 
-        # fire the timer every 10 milliseconds
+        # fire the timer every 10 milliseconds, yielding a maximum of 100 fps
         # this will re-draw the scene if self.dirty is True
-        self.timer.start(10)
+        self._timer.start(10)
 
 
-    def create_program(self, label, vertex_filename, fragment_filename):
-        prog = glCreateProgram()
+    def program_create(self, label, vertex_filepath, fragment_filepath):
+        """
+        Create a named OpenGL program, attach shaders to it, and remember.
+        
+        @param label
+        A string containing a unique label for the program that can be
+        passed into the item_create() funtion call, which tells the Item
+        which shaders to use for its drawing.
+        
+        @param vertex_filepath
+        A string containing the absolute filepath of the GLSL vertex shader
+        source code.
+        
+        @param fragment_filepath
+        A string containing the absolute filepath of the GLSL fragment shader
+        source code.
+        """
+        prog_id = glCreateProgram()
         
         # create vertex and fragment shaders which are temporary
-        vertex   = glCreateShader(GL_VERTEX_SHADER)
-        fragment = glCreateShader(GL_FRAGMENT_SHADER)
+        vertex_id   = glCreateShader(GL_VERTEX_SHADER)
+        fragment_id = glCreateShader(GL_FRAGMENT_SHADER)
         
         # set the GLSL sources
-        with open(os.path.dirname(os.path.realpath(__file__)) + "/shaders/" + vertex_filename, "r") as f: vertex_code = f.read()
-        with open(os.path.dirname(os.path.realpath(__file__)) + "/shaders/" + fragment_filename, "r") as f: fragment_code = f.read()
-        glShaderSource(vertex, vertex_code)
-        glShaderSource(fragment, fragment_code)
+        with open(vertex_filepath, "r") as f: vertex_code = f.read()
+        with open(fragment_filepath, "r") as f: fragment_code = f.read()
+        
+        glShaderSource(vertex_id, vertex_code)
+        glShaderSource(fragment_id, fragment_code)
         
         # compile shaders
-        glCompileShader(vertex)
-        glCompileShader(fragment)
+        glCompileShader(vertex_id)
+        glCompileShader(fragment_id)
         
         # associate the shaders with the program
-        glAttachShader(prog, vertex)
-        glAttachShader(prog, fragment)
+        glAttachShader(prog_id, vertex_id)
+        glAttachShader(prog_id, fragment_id)
         
         # link the program
-        glLinkProgram(prog)
+        glLinkProgram(prog_id)
         
         # once compiled and linked, the shaders are in the firmware
         # and can be discarded from the application context
-        glDetachShader(prog, vertex)
-        glDetachShader(prog, fragment)
+        glDetachShader(prog_id, vertex_id)
+        glDetachShader(prog_id, fragment_id)
         
-        self.programs[label] = prog
+        # remember the program id for later
+        self._programs[label] = prog_id
         
         
-    def remove_item(self, label):
-        """ delete a previously created scene item
+    def item_create(self, class_name, label, program_name, *args):
+        """ Creates an item and returns the object for further manipulation.
+        
+        @param class_name
+        A string of the class name that should be instantiated and drawn.
+        e.g. "Star", "CoordSystem" etc. See item.py for available classes.
+        
+        @param label
+        A string containing the unique label for this item.
+        
+        @param program_name
+        A string containing the label of a previously created program.
+        The item will be rendered using this program/shaders.
+        
+        @param *args
+        Arguments to pass to the initialization method of the given
+        `class_name`. See item.py for the required arguments.
+        """
+        if not label in self.items:
+            # create
+            prog = self._programs[program_name]
+            klss = self.str_to_class(class_name)
+            item = klss(label, prog, *args)
+            self.items[label] = item
+        else:
+            item = self.items[label]
+        return item
+    
+    
+    def item_remove(self, label):
+        """ Removes a previously created item. It will disappear from the
+        scene.
+        
+        @param label
+        A string containing the unique label of the previously create item.
         """
         if label in self.items:
-            self.items[label].remove()
+            item = self.items[label]
+            item.remove()
             del self.items[label]
-            self.dirty = True
         
 
     def paintGL(self):
@@ -164,79 +270,96 @@ class PainterWidget(QGLWidget):
         'dirty' by the window manager. It also fires during mouse
         interactivity.
         
-        paintGL() traditionally is structured in the following way:
+        paintGL() traditionally is structured in the following way, see
+        also OpenGL documentation:
         
         1. Call to glClear()
-        2. Uploading of View and Projection matrices, controlling the 
-           position and rotation of the actually non-existing "camera"
-           in the scene.
+        2. Uploading of per-frame CPU-calculated data if they have changed
+           since the last call. This can include:
+           a. Projection and View matrices
+           b. For each object in the scene:
+               - Model Matrix (translation, scale, rotation of object)
         3. For each object in the scene:
-            a. Uploading of Model matrix controlling the translation,
-            scale, and rotation of the object
-            b. Binding the data of the object
-            c. Drawing the data of the object
+           a. Binding the data buffers of the object
+           b. Drawing of the object
         """
-        print("paintGL called")
+        #print("paintGL called")
         
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         
-        for key, prog in self.programs.items():
-            glUseProgram(prog)
+        # loop over all programs/shaders
+        # first switch to that program (expensive operation)
+        # then draw all items belonging to that program
+        for key, prog_id in self._programs.items():
+            glUseProgram(prog_id)
             
             # ======= VIEW MATRIX BEGIN ==========
-            # rotate and translate the View matrix by mouse controlled vectors
-            mat_v = QMatrix4x4() # start with a unity matrix
+            # start with an empty matrix
+            self.mat_v = QMatrix4x4()
             
-            # the order of translate and rotate is significant!
-            # here we do traslate/rotate/translate for subjectively good mouse interaction
-            #mat_v.translate(self._translation_vec) # math is done by Qt!
-            mat_v.rotate(self._rotation_quat) # math is done by Qt!
+            # rotate the world
+            self.mat_v.rotate(self._rotation_quat) # math is done by Qt!
             
-            mat_v.translate(self._translation_vec) # math is done by Qt!
+            # translate the world
+            self.mat_v.translate(self._translation_vec) # math is done by Qt!
             
-            self._mat_v_inverted = mat_v.inverted()[0] # items need to know the current view matrix
-            mat_v = Item.qt_mat_to_array(mat_v) # Transform Qt object to Python list
+            # calculate inverse view matrix which contains
+            # camera right, up, look directions, and camera position
+            # Items in "billboard" mode will need this to know where the camera is
+            self.mat_v_inverted = self.mat_v.inverted()[0]
             
-            cam_right = self._mat_v_inverted * QVector4D(1,0,0,0)
+            # the right direction of the camera
+            cam_right = self.mat_v_inverted * QVector4D(1,0,0,0) # extract 1st column
             self.cam_right = QVector3D(cam_right[0], cam_right[1], cam_right[2])
             
-            cam_up = self._mat_v_inverted * QVector4D(0,1,0,0)
+            # the up direction of the camera
+            cam_up = self.mat_v_inverted * QVector4D(0,1,0,0) # extract 2nd column
             self.cam_up = QVector3D(cam_up[0], cam_up[1], cam_up[2])
             
-            cam_look = self._mat_v_inverted * QVector4D(0,0,1,0)
-            self._cam_look = QVector3D(cam_look[0], cam_look[1], cam_look[2])
+            # the look direction of the camera
+            cam_look = self.mat_v_inverted * QVector4D(0,0,1,0) # extract 3rd column
+            self.cam_look = QVector3D(cam_look[0], cam_look[1], cam_look[2])
             
-            # extract 4th column which is camera position
-            cam_pos = self._mat_v_inverted * QVector4D(0,0,0,1)
-            self._cam_pos = QVector3D(cam_pos[0], cam_pos[1], cam_pos[2])
+            # the postion of the camera
+            cam_pos = self.mat_v_inverted * QVector4D(0,0,0,1) # extract 4th column
+            self.cam_pos = QVector3D(cam_pos[0], cam_pos[1], cam_pos[2])
             
-            # make the View matrix accessible to the vertex shader as the variable name "mat_v"
-            loc_mat_v = glGetUniformLocation(prog, "mat_v")
-            # copy the data into the "mat_v" GPU variable
-            glUniformMatrix4fv(loc_mat_v, 1, GL_TRUE, mat_v)
-            # ======= PROJECTION MATRIX END ==========
+            # upload the View matrix into the GPU,
+            # accessible to the vertex shader under the variable name "mat_v"
+            mat_v_list = PainterWidget.qt_mat_to_list(self.mat_v) # Transform Qt object to Python list
+            loc_mat_v = glGetUniformLocation(prog_id, "mat_v")
+            glUniformMatrix4fv(loc_mat_v, 1, GL_TRUE, mat_v_list)
+            # ======= VIEW MATRIX END ==========
             
             
             # ======= PROJECTION MATRIX BEGIN ==========
-            # calculate the aspect ratio of the window
-            
-            mat_p = QMatrix4x4() # start with a unity matrix
-            mat_p.perspective(self._fov, self.aspect, 0.1, 100000) # math is done by Qt!
-            
-            mat_p = Item.qt_mat_to_array(mat_p) #Transform Qt object to Python list
-            
-            # make the View matrix accessible to the vertex shader as the variable name "mat_p"
-            loc_mat_p = glGetUniformLocation(prog, "mat_p")
-            # copy the data into the "mat_p" GPU variable
-            glUniformMatrix4fv(loc_mat_p, 1, GL_TRUE, mat_p)
+            self.mat_p = QMatrix4x4() # start with an empty matrix
+            self.mat_p.perspective(self.fov, self.aspect, 0.1, 100000) # math is done by Qt!
             # ======= PROJECTION MATRIX END ==========
             
             
-            # Each Item knows how to draw() itself (see step 3 in comment above)
+            # upload the Projection matrix into the GPU,
+            # accessible to the vertex shader under the variable name "mat_p"
+            mat_p_list = PainterWidget.qt_mat_to_list(self.mat_p) #Transform Qt object to Python list
+            loc_mat_p = glGetUniformLocation(prog_id, "mat_p")
+            glUniformMatrix4fv(loc_mat_p, 1, GL_TRUE, mat_p_list)
+            # ======= PROJECTION MATRIX END ==========
+            
+            
+            # Draw items belonging to this program
             for key, item in self.items.items():
-                if item.program == prog:
-                    item.draw(self._mat_v_inverted)
+                if item.program_id == prog_id:
+                    # a draw call usually consists of
+                    #   1. upload Model matrix to GPU
+                    #   2. call glBindVertexArray()
+                    #   3. call glBindBuffer()
+                    #   4. call glDraw...()
+                    
+                    # "billboard" items need camera coordinates which are stored
+                    # in the inverted View matrix
+                    item.draw(self.mat_v_inverted)
       
+        # nothing more to do here!
         # Swapping the OpenGL buffer is done automatically by Qt.
 
 
@@ -250,13 +373,15 @@ class PainterWidget(QGLWidget):
         glViewport(0, 0, width, height)
 
 
-    """ Called by the Qt libraries whenever the window receives a mouse click.
-    Left button is used to rotate. Middle button is used to pan/translate.
-    Note that this simply sets the "starting" values before the mouse is moved.
-    The actual changes of the translation and rotation vectors are calculated in
-    mouseMoveEvent()
-    """
     def mousePressEvent(self, event):
+        """ Called by the Qt libraries whenever the window receives a mouse click.
+        
+        For info on mouse navigation see comments for this class above.
+        
+        Note that this method simply sets the "starting" values before
+        the mouse is moved. The actual translation and rotation vectors
+        are calculated in mouseMoveEvent().
+        """
         btns = event.buttons()
         x = event.localPos().x()
         y = event.localPos().y()
@@ -270,21 +395,20 @@ class PainterWidget(QGLWidget):
             self._translation_vec_start = self._translation_vec
             
         elif btns & (Qt.RightButton):
-            #self._mouse_fov_start = x
-            #self._fov_start = self._fov
-            
             self._mouse_camforward_start = y
             self._translation_vec_start = self._translation_vec
         
         
-    """ Called by the Qt libraries whenever the window receives a mouse wheel change.
-    This is used for zooming.
-    """
     def wheelEvent(self, event):
+        """
+        Called by the Qt libraries whenever the window receives a mouse wheel change.
+        
+        This is used for zooming, or rather moving the camera ahead.
+        """
         delta = event.angleDelta().y()
         
         # move in look direction of camera
-        self._translation_vec += self._cam_look * delta / 15
+        self._translation_vec += self.cam_look * delta / 15
         
         # re-paint at the next timer tick
         self.dirty = True
@@ -296,20 +420,29 @@ class PainterWidget(QGLWidget):
 
 
     def mouseMoveEvent(self, event):
+        """
+        Called by the Qt libraries whenever the window receives a mouse
+        move/drag event.
+        """
         btns = event.buttons()
+        
+        # pixel coordinates relative to the window
         x = event.localPos().x()
         y = event.localPos().y()
         
         if btns & Qt.LeftButton:
-            # rotation via quaternions, see
+            # Rotation via emulated trackball using quaternions.
+            # For method employed see:
             # https://en.wikipedia.org/wiki/Quaternions_and_spatial_rotation
             
             # get current vector from sphere/trackball center to surface
             mouse_rotation_current_vec = self._find_trackball_vector(x, y)
             
-            # get the angle between the vector at mouse click
-            # and the current vector
-            angle_between = PainterWidget.angle_between(mouse_rotation_current_vec, self._mouse_rotation_start_vec)
+            # get the angle between the vector which was stored at the
+            # time of mouse click and the current vector
+            angle_between = PainterWidget.angle_between(
+                mouse_rotation_current_vec,
+                self._mouse_rotation_start_vec)
             
             angle_between *= 20 # arbitrary amplification for faster rotation
             
@@ -318,7 +451,8 @@ class PainterWidget(QGLWidget):
                 self._mouse_rotation_start_vec,
                 mouse_rotation_current_vec)
             
-            # create a rotated normalized quaternion
+            # create a rotated normalized quaternion corresponding to the
+            # drag distance travelled by the mouse since the click
             delta = QQuaternion.fromAxisAndAngle(rotation_axis, angle_between)
             delta.normalize()
             
@@ -327,7 +461,7 @@ class PainterWidget(QGLWidget):
             self._rotation_quat.normalize()
             
         elif btns & Qt.MidButton:
-            # simple X-Y translation, sensitivity depending on zoom
+            # Translation left/right and up/down depending on camera orientation
             diff = QVector3D(x, y, 0) - self._mouse_translation_start_vec
             diff_x = diff[0]
             diff_y = diff[1]
@@ -335,13 +469,9 @@ class PainterWidget(QGLWidget):
             self._translation_vec = self._translation_vec_start - self.cam_right * diff_x * 2 + self.cam_up * diff_y * 2
             
         elif btns & Qt.RightButton:
-            #diff_x = x - self._mouse_fov_start
-            #self._fov = self._fov_start - diff_x
-            #if self._fov < 3: self._fov = 3
-            #if self._fov > 130: self._fov = 130
-            
+            # Translation forward/backward depending on camera orientation
             diff_y = y - self._mouse_camforward_start
-            self._translation_vec = self._translation_vec_start - self._cam_look * diff_y * 2
+            self._translation_vec = self._translation_vec_start - self.cam_look * diff_y * 2
             
         
         # re-draw at next timer tick
@@ -356,6 +486,12 @@ class PainterWidget(QGLWidget):
         
         It follows the principles outlined here:
         https://www.opengl.org/wiki/Object_Mouse_Trackball
+        
+        @param px
+        Integer horizontal pixel coordinate relative to the window
+        
+        @param px
+        Integer vertical pixel coordinate relative to the window
         """
         
         # Calculate the normalized -1..1 (x,y) coords of the mouse in the window.
@@ -412,34 +548,39 @@ class PainterWidget(QGLWidget):
         if self.dirty:
             self.updateGL()
             self.dirty = False
-    
-    
-    def item_create(self, class_name, label, program_name, *args):
-        if not label in self.items:
-            # create
-            prog = self.programs[program_name]
-            klss = self.str_to_class(class_name)
-            item = klss(label, prog, *args)
-            self.items[label] = item
-        else:
-            item = self.items[label]
-        return item
-    
-    
-    def item_remove(self, label):
-        item = None
-        if label in self.items:
-            item = self.items[label]
-            item.remove()
-            del self.items[label]
-        return item
-    
+            
 
     @staticmethod
     def angle_between(v1, v2):
+        """
+        Returns angle in radians between vector v1 and vector v2.
+        
+        @param v1
+        Vector 1 of class QVector3D
+        
+        @param v2
+        Vector 2 of class QVector3D
+        """
         return math.acos(QVector3D.dotProduct(v1, v2) / (v1.length() * v2.length()))
     
     
     @staticmethod
     def str_to_class(str):
         return getattr(sys.modules[__name__], str)
+    
+
+    @staticmethod
+    def qt_mat_to_list(mat):
+        """
+        Transforms a QMatrix4x4 into a one-dimensional Python list
+        in row-major order.
+        
+        @param mat
+        Matrix of type QMatrix4x4
+        """
+        arr = [0] * 16
+        for i in range(4):
+            for j in range(4):
+                idx = 4 * i + j
+                arr[idx] = mat[i, j]
+        return arr
