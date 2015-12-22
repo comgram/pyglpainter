@@ -6,6 +6,33 @@ from OpenGL.GL import *
 from .base_item import BaseItem
 
 class GcodePath(BaseItem):
+    """
+    @param label
+    A string containing a unique name for this object
+        
+    @param prog_id
+    OpenGL program ID (determines shaders to use) to use for this object
+    
+    @param gcode
+    A Python list of strings of G-codes to draw
+    
+    @param cwpos
+    Current working position. The G-code way of drawing/moving requires
+    a current working position for the first movement command, which
+    would otherwise be unknown. Set the current machine position as 3-tuple.
+    
+    @param ccs
+    Current coordinate system. Integer range from 4..9 (corresponding to G54-G59)
+    `ccs` must be a key in `cs_offsets`
+    
+    @param cs_offsets
+    Coordinate system offsets. A Python dict with integer keys and
+    3-tuples as offsets. Keys must correspond to the range of `ccs`.
+    When a G54-G59 change coordinate system command is encountered,
+    the position for the next movement command will be relative to the
+    selected offset. This emulates the movement behavior of a classical
+    CNC machine.
+    """
     def __init__(self, label, prog, gcode, cwpos, ccs, cs_offsets):
         vertex_count = 2 * (len(gcode) + 1)
         super(GcodePath, self).__init__(label, prog, vertex_count)

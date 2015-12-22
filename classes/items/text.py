@@ -5,7 +5,21 @@ from .base_item import BaseItem
 from .fonts import font_dutch_blunt as font
 
 class Text(BaseItem):
-    def __init__(self, label, prog, txt):
+    """
+    Renders text with a triangle-only font. See font_dutch_blunt.py for 
+    more information.
+    
+    @param label
+    A string containing a unique name for this object
+        
+    @param prog_id
+    OpenGL program ID (determines shaders to use) to use for this object
+    
+    @param txt
+    Text to be rendered. A string which should only contain ASCII
+    characters from 24-127 plus \n
+    """
+    def __init__(self, label, prog_id, txt):
         
         charnum = len(txt)
         
@@ -14,10 +28,9 @@ class Text(BaseItem):
         vertexcount_total = 0
         for char in txt:
             j = ord(char) - firstcharidx
-            #if j < 33 or j > 127: continue # this includes \n but reserving a few bytes more doesn't matter
             vertexcount_total += font.sizes[j]
             
-        super(Text, self).__init__(label, prog, vertexcount_total, GL_TRIANGLES, True)
+        super(Text, self).__init__(label, prog_id, vertexcount_total, GL_TRIANGLES, True)
         
         letterpos = 0
         letterspacing = 1

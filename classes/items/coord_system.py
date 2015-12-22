@@ -4,10 +4,31 @@ from OpenGL.GL import *
 from .base_item import BaseItem
 
 class CoordSystem(BaseItem):
-    def __init__(self, label, prog, scale=1, origin=(0, 0, 0), linewidth=1, hilight=False):
+    """
+    Draws a classical XYZ coordinate system with colors RGB.
+    
+    @param label
+    A string containing a unique name for this object
+        
+    @param prog_id
+    OpenGL program ID (determines shaders to use) to use for this object
+    
+    @param scale
+    The axes of the CS are length 1. Use `scale` to scale
+    
+    @param origin
+    The position of the CS in world coordinates
+    
+    @param linewidth
+    The line width in pixels
+    
+    @param hilight
+    Set to True to make a gradient towards white, towards the center
+    """
+    def __init__(self, label, prog_id, scale=1, origin=(0, 0, 0), linewidth=1, hilight=False):
         
         vertex_count = 6
-        super(CoordSystem, self).__init__(label, prog, vertex_count)
+        super(CoordSystem, self).__init__(label, prog_id, vertex_count)
         
         self.primitive_type = GL_LINES
         self.linewidth = linewidth

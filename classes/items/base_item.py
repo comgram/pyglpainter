@@ -4,55 +4,130 @@ import ctypes
 import sys
 import math
 
-
 from PyQt5.QtGui import QColor, QMatrix4x4, QVector2D, QVector3D, QVector4D, QQuaternion
-
 
 import OpenGL
 from OpenGL.GL import *
 
 class BaseItem():
-    def __init__(self, label, prog, vertexcount, primitive_type=GL_LINES, filled=False, line_width=1):
-        self.vbo = glGenBuffers(1)
-        self.vao = glGenVertexArrays(1)
-        self.program_id = prog
+    """
+    This class represents a separate object in 3D space.
+    
+    It implements OpenGL per-object boilerplate functions.
+    
+    Most importantly, a Base Item has its own relative coordinate system
+    with local (0,0,0) located at global self.origin.
+    
+    It also has its own units of measurement determined by self.scale.
+    
+    It can be rotated around its own origin by self.rotation_angle and
+    self.rotation_vector.
+    
+    An instance of this class knows how to
+      * add CPU vertex data (color and position) as simple tuples
+      * manage all vertex data in numpy format
+      * upload CPU vertex data into the GPU fully or in part (substitute)
+      * draw itself
+      * remove itself
+      * calculate it's own Model matrix (optionally in "billboard" mode)
+      
+    You can use this class as it is for drawing raw OpenGL primitives.
+    
+    You can subclass to implement composite primitives (see other classes
+    in this directory).
+    """
+    
+    def __init__(self, label, prog_id, vertexcount, primitive_type=GL_LINES, filled=False, line_width=1):
+        """
+        @param label
+        A string containing a unique name for this object
+        
+        @param prog_id
+        OpenGL program ID (determines shaders to use) to use for this object
+        
+        @param vertexcount
+        The maximum number of vertices to reserve for the CPU und GPU data buffers.
+        You may append only a part of that via `append()`
+        
+        @param primitive_type
+        An integer constant GL_LINES, GL_LINE_STRIP, GL_TRINAGLES, GL_TRINAGLE_STRIP
+        etc.
+        
+        @param filled
+        True or False. Determines if drawn triangles will be filled with color.
+        
+        @param line_width
+        An integer giving the line width in pixels.
+        """
+        
+        self.vbo = glGenBuffers(1) # VertexBuffer ID
+        self.vao = glGenVertexArrays(1) # VertexArray ID
+        
+        self.program_id = prog_id # the program/shader to use
         self.label = label
 
-        self.elementcount = 0
-        
+        self.vertexcount = vertexcount # maximum number of vertices
+        self.elementcount = 0 # current number of appended/used vertices
+
         self.primitive_type = primitive_type
         self.linewidth = line_width
+        self.filled = filled # if a triangle should be drawn filled
         
-        self.filled = filled
+        # billboard mode
+        self.billboard = False # set to True to always face camera
+        self.billboard_axis = None # must be strings "X", "Y", or "Z"
         
-        self.billboard = False
-        self.billboard_axis = None
+        self.scale = 1 # 1 local unit corresponds to 1 world unit
         
-        self.scale = 1
-        self.origin = QVector3D(0, 0, 0)
-        self.rotation_angle = 0
-        self.rotation_vector = QVector3D(0, 1, 0)
+        # by default congruent with world origin
+        self.origin = QVector3D(0, 0, 0) 
+        
+        # by default not rotated
+        self.rotation_angle = 0 
+        self.rotation_vector = QVector3D(0, 1, 0) # default rotation around Y
         
         self.dirty = True
-        
-        self.vertexcount = vertexcount
+
+        # The CPU vertex data buffer is managed with numpy
         self.data = np.zeros(self.vertexcount, [("position", np.float32, 3), ("color", np.float32, 4)])
         
         
     def __del__(self):
-        print("DELETING MYSELF: {}".format(self.label))
+        print("Item {}: deleting myself.".format(self.label))
         
     
-    # simply appends to numpy data structure but neither uploads nor draws
     def append(self, pos, col=(1, 1, 1, 1)):
+        """
+        Appends one vertex with position and color to CPU data storage
+        but neither uploads nor draws.
+        
+        @param pos
+        3-tuple of floats for position
+        
+        @param col
+        4-tuple of floats for color RGBA
+        """
         self.data["position"][self.elementcount] = pos
         self.data["color"][self.elementcount] = col
         self.elementcount += 1
     
     
-    # for large buffer sizes, to avoid frequently uploading the entire buffer
-    # simply replace the data
     def substitute(self, vertex_nr, pos, col):
+        """
+        If your object contains a very large vertex count, it may be more
+        efficient to substitute data directly on the GPU instead of
+        re-uploading everything. Use this to modify data.
+        
+        @param vertex_nr
+        Number of vertex to substitute
+        
+        @param pos
+        3-tuple of floats. Position to substitue for specified vertex
+        
+        @params col
+        4-tuple of RGBA color. Color to substitute for specified vertex
+        
+        """
         stride = self.data.strides[0]
         position_size = self.data.dtype["position"].itemsize
         color_size = self.data.dtype["color"].itemsize
@@ -71,17 +146,26 @@ class BaseItem():
     
     
     def remove(self):
+        """
+        Removes self from the scene. The object will disappear.
+        """
         glDeleteBuffers(1, [self.vbo])
         glDeleteVertexArrays(1, [self.vao])
         self.dirty = True
-        print("REMOVING {}".format(self.label))
+        print("Item {}: removing myself.".format(self.label))
+        
         
     def upload(self):
+        """
+        This method will upload the entire CPU vertex data to the GPU.
+        
+        Call this once after all the CPU data have been set with append().
+        """
         glBindVertexArray(self.vao)
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
         glBufferData(GL_ARRAY_BUFFER, self.data.nbytes, self.data, GL_DYNAMIC_DRAW)
         
-        print("UPLOADING {} BYTES".format(self.data.nbytes))
+        print("Item {}: uploading {} bytes.".format(self.label, self.data.nbytes))
         stride = self.data.strides[0]
         
         offset = ctypes.c_void_p(0)
@@ -94,30 +178,52 @@ class BaseItem():
         glEnableVertexAttribArray(loc)
         glVertexAttribPointer(loc, 4, GL_FLOAT, False, stride, offset)
         
-        # unbind
+        # unbind (not strictly neccessary)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
         
         
     def set_scale(self, fac):
+        """
+        Alternative method to set scale.
+        
+        @param fac
+        Scale factor
+        """
         self.scale = fac
         
         
     def set_origin(self, tpl):
+        """
+        Alternative method to set origin.
+        
+        @param tpl
+        Origin of self in world coordinates as 3-tuple
+        """
         self.origin = QVector3D(*tpl)
 
         
-    def draw(self, viewmatrix=None):
-        # upload Model Matrix
-        mat_m = self.calculate_model_matrix(viewmatrix)
+    def draw(self, viewmatrix_inverted=None):
+        """
+        Draws this object. Call this from within paintGL().
+        
+        @param viewmatrix_inverted
+        The inverted View matrix. It contains Camera position and angles.
+        Mandatory only when self.billboard == True
+        """
+        
+        # Calculate the Model matrix
+        mat_m = self.calculate_model_matrix(viewmatrix_inverted)
 
         if self.filled:
             glPolygonMode( GL_FRONT_AND_BACK, GL_FILL )
         else:
             glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
         
+        # this determines which shaders will be used
         glUseProgram(self.program_id)
         
+        # upload Model matrix, accessible in the shader as variable mat_m
         mat_m = self.qt_mat_to_list(mat_m)
         loc_mat_m = glGetUniformLocation(self.program_id, "mat_m")
         glUniformMatrix4fv(loc_mat_m, 1, GL_TRUE, mat_m)
@@ -130,7 +236,7 @@ class BaseItem():
         glLineWidth(self.linewidth)
         glDrawArrays(self.primitive_type, 0, self.elementcount)
         
-        # unbind VBO and VAO
+        # unbind VBO and VAO, not strictly neccessary
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
         
@@ -138,11 +244,30 @@ class BaseItem():
         
         
     def calculate_model_matrix(self, viewmatrix_inv=None):
+        """
+        Calculates the Model matrix based upon self.origin and self.scale.
+        
+        If self.billboard == False, the Model matrix will also be rotated
+        determined by self.rotation_angle and self.rotation_axis.
+        
+        If self.billboard == True and self.billboard_axis == None
+        the Model matrix will also be rotated so that the local Z axis
+        will face the camera and the local Y axis will be parallel to
+        the camera up axis.
+        
+        If self.billboard == True and self.billboard_axis is either "X",
+        "Y", or "Z", the local Z axis will always face the camera, but
+        the rotation will be restricted to billboard_axis.
+        
+        @param viewmatrix_inv
+        The inverted View matrix as class QMatrix4x4. Mandatory when
+        self.billboard == True, otherwise optional.
+        """
         mat_m = QMatrix4x4()
         mat_m.translate(self.origin)
         
         if self.billboard:
-            # based on excellent tutorial:
+            # billboard calulation based on excellent tutorial:
             # http://nehe.gamedev.net/article/billboarding_how_to/18011/
             
             # extract 2nd column which is camera up vector
@@ -150,21 +275,16 @@ class BaseItem():
             cam_up = QVector3D(cam_up[0], cam_up[1], cam_up[2])
             cam_up.normalize()
             
-            # extract 3rd column which is camera look vector
-            cam_look = viewmatrix_inv * QVector4D(0,0,1,0)
-            cam_look = QVector3D(cam_look[0], cam_look[1], cam_look[2])
-            cam_look.normalize()
-            
             # extract 4th column which is camera position
             cam_pos = viewmatrix_inv * QVector4D(0,0,0,1)
             cam_pos = QVector3D(cam_pos[0], cam_pos[1], cam_pos[2])
             
-            # calculate self look vector (self to camera)
+            # calculate self look vector (vector from self.origin to camera)
             bill_look = cam_pos - self.origin
             bill_look.normalize()
             
             if self.billboard_axis == None:
-                # Fully aligned billboard
+                # Fully aligned billboard, not restricted in axis
                 # calculate new self right vector based upon self look and camera up
                 bill_right = QVector3D.crossProduct(cam_up, bill_look)
                 
@@ -188,12 +308,14 @@ class BaseItem():
                 
                 bill_right = QVector3D.crossProduct(bill_up, bill_look)
             
-            # view and model matrices are actually nicely structured
+            # View and Model matrices are actually nicely structured!
             # 1st column: right vector
             # 2nd column: up vector
             # 3rd column: look vector
             # 4th column: position
-            # here we only overwrite right, up and look. Position is already there.
+            
+            # here we only overwrite right, up and look.
+            # Position is already there, and we don't have to change it.
             mat_m[0,0] = bill_right[0]
             mat_m[1,0] = bill_right[1]
             mat_m[2,0] = bill_right[2]
@@ -227,6 +349,7 @@ class BaseItem():
         """
         return math.acos(QVector3D.dotProduct(v1, v2) / (v1.length() * v2.length()))
     
+
     @staticmethod
     def qt_mat_to_list(mat):
         """
