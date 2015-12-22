@@ -45,7 +45,7 @@ class Text(BaseItem):
         
         charnum = len(txt)
         
-        firstcharidx = 24
+        firstcharidx = 0
         
         vertexcount_total = 0
         for char in txt:
