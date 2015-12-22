@@ -1,12 +1,9 @@
 # pyglpainter - Python OpenGL Painter
 
-(c) 2015 Michael Franzl
+Minimalistic but modern OpenGL drawing for technical applications
 
-MIT License (see below for wording)
-
-## Minimalistic but modern OpenGL drawing for technical applications
-
-This class extends PyQt5's QGLWidget with boilerplate code neccessary
+This module includes the class PainterWidget, extending
+PyQt5's QGLWidget with boilerplate code neccessary
 for applications which want to build a classical orthagnoal 3D world
 in which the user can interactively navigate with the mouse via the
 classical (and expected) Pan-Zoom-Rotate paradigm implemented via a
@@ -35,9 +32,9 @@ code into native Qt C++ is therefore trivial.
 Look at example.py, part of this project, to see how this class can
 be used. If you need more functionality, consider subclassing.
 
-Most of the time, calls to item_create() are enough to build a 3D
+Most of the time, calls to `item_create()` are enough to build a 3D
 world with interesting objects in it (the name for these objects here
-is "items"). This class supports items with different shaders.
+is "items"). Items can be rendered with different shaders.
 
 This project was originally created for a CNC application, but then
 extracted from this application and made multi-purpose. The author
@@ -47,9 +44,7 @@ project was optimized for technical, line- and triangle based
 primitives, not the realism that game engines strive for. The simple
 shaders included in this project will draw aliased lines and the
 output therefore will look more like computer graphics of the 80's.
-But "modern" OpenGL moves all of the realism algorithms into shaders
-which cannot therefore be part of the CPU application supplying raw
-vertex attributes.
+But "modern" OpenGL offloads many things into shaders anyway.
 
 This class can either be used for teaching purposes, experimentation,
 or as a visualization backend for production-class applications.
@@ -65,17 +60,17 @@ Wheel rotate up/down: Move camera ahead/back
 Right Button drag up/down: Move camera ahead/back (same as wheel)
 
 The FOV (Field of View) is held constant. "Zooming" is rather moving
-the camera ahead, which is more natural than changing the FOV of the 
-camera. Even cameras in movies and TV series very, very rarely zoom
-any more.
+the camera forward alongs its look axis, which is more natural than
+changing the FOV of the camera. Even cameras in movies and TV series
+nowadays very, very rarely zoom.
 
 ## Installation
 
 Clone this git repository
 
-Then install some dependencies (tested on Debian Jessie only)
+Then install some dependencies (tested on Debian Jessie)
 
-    apt-get install python3-pyqt5 python3-pyqt5.qtopengl
+    apt-get install python3-numpy python3-pyqt5 python3-pyqt5.qtopengl python3-opengl
     
 I may have forgotten other dependencies. Please let me know if something is missing.
 
@@ -86,6 +81,19 @@ All features of pyglpainter are shown in an OpenGL window (install dependencies
 first):
 
     python3 ./example.py
+    
+#### Individual steps
+
+You first need to create a PyQt5 window, then add to it a PainterWidget
+instance (for working code see example.py). Let's say this PainterWidget
+instance is the variable `painter`. You then can simply draw a coordinate system:
+
+    mycs1 = painter.item_create("CoordSystem", "mycs1", "simple3d", 12, (0, 0, 0))
+    
+This means: Painter, create an item of class CoordSystem called "mycs1"
+with the program called "simple3d". Scale it by 12 and put its origin to
+the world coordinates (0,0,0).
+    
 
 ## TODO:
 
