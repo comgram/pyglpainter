@@ -30,7 +30,7 @@ from PyQt5.QtGui import QVector3D
 import OpenGL
 from OpenGL.GL import *
 
-from classes.mainwindow import MainWindow
+from mainwindow import MainWindow
 
 def main():
     app = QApplication(sys.argv)
