@@ -32,13 +32,13 @@ from PyQt5.QtGui import QColor, QMatrix4x4, QVector2D, QVector3D, QVector4D, QQu
 import OpenGL
 from OpenGL.GL import *
 
-class BaseItem():
+class Item():
     """
     This class represents a separate object in 3D space.
     
     It implements OpenGL per-object boilerplate functions.
     
-    Most importantly, a Base Item has its own relative coordinate system
+    Most importantly, an Item has its own relative coordinate system
     with local (0,0,0) located at global self.origin.
     
     It also has its own units of measurement determined by self.scale.
@@ -60,7 +60,7 @@ class BaseItem():
     in this directory).
     """
     
-    def __init__(self, label, prog_id, vertexcount, primitive_type=GL_LINES, filled=False, line_width=1):
+    def __init__(self, label, prog_id, primitive_type=GL_LINES, line_width=1, origin=(0,0,0), scale=1, vertexcount=0, filled=False):
         """
         @param label
         A string containing a unique name for this object
@@ -69,18 +69,23 @@ class BaseItem():
         OpenGL program ID (determines shaders to use) to use for this object
         
         @param vertexcount
-        The maximum number of vertices to reserve for the CPU und GPU data buffers.
-        You may append only a part of that via `append()`
+        xxx
+        
+        @param origin
+        Origin of item in world coordinates.
+        
+        @param scale
+        Scale of item.
         
         @param primitive_type
         An integer constant GL_LINES, GL_LINE_STRIP, GL_TRINAGLES, GL_TRINAGLE_STRIP
         etc.
         
-        @param filled
-        True or False. Determines if drawn triangles will be filled with color.
-        
         @param line_width
         An integer giving the line width in pixels.
+        
+        @param filled
+        True or False. Determines if drawn triangles will be filled with color.
         """
         
         self.vbo = glGenBuffers(1) # VertexBuffer ID
@@ -100,10 +105,11 @@ class BaseItem():
         self.billboard = False # set to True to always face camera
         self.billboard_axis = None # must be strings "X", "Y", or "Z"
         
-        self.scale = 1 # 1 local unit corresponds to 1 world unit
+        self.scale = scale # 1 local unit corresponds to scale world units
         
         # by default congruent with world origin
-        self.origin = QVector3D(0, 0, 0) 
+        self.origin = QVector3D(*origin) 
+        self.origin_tuple = origin
         
         # by default not rotated
         self.rotation_angle = 0 
@@ -117,24 +123,44 @@ class BaseItem():
         
     def __del__(self):
         print("Item {}: deleting myself.".format(self.label))
-        
     
-    def append(self, pos, col=(1, 1, 1, 1)):
+    
+    def append_vertices(self, vertexdata):
         """
-        Appends one vertex with position and color to CPU data storage
-        but neither uploads nor draws.
+        Appends vertices, each defined with with position and color,
+        to CPU data storage but neither uploads to GPU nor draws them.
         
-        @param pos
-        3-tuple of floats for position
+        @param vertexdata
+        A Python list. Each list element is a list [position, color]
+        where position is a 3-tuple and color is a 4-tuple.
         
-        @param col
-        4-tuple of floats for color RGBA
         """
-        self.data["position"][self.elementcount] = pos
-        self.data["color"][self.elementcount] = col
-        self.elementcount += 1
-    
-    
+        length_to_append = len(vertexdata)
+        if self.elementcount + length_to_append > self.vertexcount:
+            raise IndexError("Item '{}': You are trying to append more vertices for item than the maximum of {}. Use set_vertexcount to increase the maximum possible vertices.".format(self.label, self.vertexcount))
+        
+        for vertex in vertexdata:
+            self.data["position"][self.elementcount] = vertex[0]
+            self.data["color"][self.elementcount] = vertex[1]
+            self.elementcount += 1
+
+
+    def set_vertexcount(self, new_count):
+        """
+        Increase the CPU data buffer size to a value larger than the one
+        set during initialization. This is an expensive operation.
+        
+        @param new_count
+        The new maximum number of supported vertices.
+        """
+        if new_count > self.vertexcount:
+            self.vertexcount = new_count
+            extension = np.zeros(new_count, [("position", np.float32, 3), ("color", np.float32, 4)])
+            self.data = np.append(self.data, extension)
+        else:
+            raise BufferError("Item '{}': You are trying to set a vertex count lower than has been reserved during initialization. This isn't yet supported. User a lower count during initialization instead.".format(self.label, self.vertexcount))
+            
+            
     def substitute(self, vertex_nr, pos, col):
         """
         If your object contains a very large vertex count, it may be more
@@ -183,6 +209,7 @@ class BaseItem():
         This method will upload the entire CPU vertex data to the GPU.
         
         Call this once after all the CPU data have been set with append().
+        Note that uploading 
         """
         glBindVertexArray(self.vao)
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
@@ -224,6 +251,7 @@ class BaseItem():
         Origin of self in world coordinates as 3-tuple
         """
         self.origin = QVector3D(*tpl)
+        self.origin_tuple = tpl
 
         
     def draw(self, viewmatrix_inverted=None):

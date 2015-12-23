@@ -23,10 +23,10 @@ OTHER DEALINGS IN THE SOFTWARE.
 import OpenGL
 from OpenGL.GL import *
 
-from .base_item import BaseItem
+from .item import Item
 from .fonts import font_dutch_blunt as font
 
-class Text(BaseItem):
+class Text(Item):
     """
     Renders text with a triangle-only font. See font_dutch_blunt.py for 
     more information.
@@ -37,31 +37,41 @@ class Text(BaseItem):
     @param prog_id
     OpenGL program ID (determines shaders to use) to use for this object
     
-    @param txt
+    @param text
     Text to be rendered. A string which should only contain ASCII
     characters from 24-127 plus \n
+    
+    @param origin
+    Origin of this item in world coordinates.
+    
+    @param scale
+    Default extent of this items is 1. Use this to modify.
+    
+    @param linewidth
+    Width of line in pixels.
+    
+    @param color
+    Color of this item
     """
-    def __init__(self, label, prog_id, txt):
+    def __init__(self, label, prog_id, text, origin=(0,0,0), scale=1, linewidth=1, color=(1,1,1,0.5)):
         
-        charnum = len(txt)
+        charnum = len(text)
         
         firstcharidx = 0
         
         vertexcount_total = 0
-        for char in txt:
+        for char in text:
             j = ord(char) - firstcharidx
             vertexcount_total += font.sizes[j]
             
-        super(Text, self).__init__(label, prog_id, vertexcount_total, GL_TRIANGLES, True)
+        super(Text, self).__init__(label, prog_id, GL_TRIANGLES, linewidth, origin, scale, vertexcount_total, True)
         
         letterpos = 0
         letterspacing = 1
         linepos = 0
         linespacing = 6
-        
-        col = (1, 1, 1, 0.6)
-        
-        for char in txt:
+
+        for char in text:
             j = ord(char) - firstcharidx
             
             if char == "\n":
@@ -79,7 +89,7 @@ class Text(BaseItem):
                 
                 x += letterpos
                 y += linepos
-                self.append((x, y, 0), col)
+                self.append_vertices([[(x, y, 0), color]])
             letterpos += w
             letterpos += letterspacing
                 

@@ -20,14 +20,16 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+import math
+import numpy as np
 import OpenGL
 from OpenGL.GL import *
 
-from .item import Item
+from .arc import Arc
 
-class CoordSystem(Item):
+class Circle(Arc):
     """
-    Draws a classical XYZ coordinate system with colors RGB.
+    xxx
     
     @param label
     A string containing a unique name for this object
@@ -35,45 +37,19 @@ class CoordSystem(Item):
     @param prog_id
     OpenGL program ID (determines shaders to use) to use for this object
     
+    xxx
+    
     @param origin
-    The position of the CS in world coordinates
+    Origin of item in world coordinates.
     
     @param scale
-    The axes of the CS are length 1. Use `scale` to scale
-    
-    @param linewidth
-    The line width in pixels
+    Scale of item.
     """
-    def __init__(self, label, prog_id, origin=(0,0,0), scale=10, linewidth=1):
+    
+    def __init__(self, label, prog_id, radius, use_triangles, filled, origin=(0,0,0), scale=1, linewidth=1, color=(1,.5,.5,1)):
         
-        vertex_count = 6
-        super(CoordSystem, self).__init__(label, prog_id, GL_LINES, linewidth, origin, scale, vertex_count)
+        start = (-radius,0,0)
+        end = start
+        offset = (radius,0,0)
         
-        self.append_vertices([[(0, 0, 0), (.6, .0, .0, 1.0)]])
-        self.append_vertices([[(1, 0, 0), (.6, .0, .0, 1.0)]])
-        self.append_vertices([[(0, 0, 0), (.0, .6, .0, 1.0)]])
-        self.append_vertices([[(0, 1, 0), (.0, .6, .0, 1.0)]])
-        self.append_vertices([[(0, 0, 0), (.0, .0, .6, 1.0)]])
-        self.append_vertices([[(0, 0, 1), (.0, .0, .6, 1.0)]])
-            
-        self.upload()
-        
-
-    def highlight(self, val):
-        """
-        Make a gradient towards white, towards the center
-        
-        @val
-        True or False
-        """
-        for x in range(0,3):
-            col = self.data["color"][x * 2 + 1]
-            if val == True:
-                newcol = (1, 1, 1, 1)
-            else:
-                newcol = (0, 0, 0, 1)
-                
-            self.data["color"][x * 2] = newcol
-
-        self.upload()
-        self.dirty = True
+        super(Circle, self).__init__(label, prog_id, start, end, offset, radius, 0, 1, 2, True, use_triangles, filled, origin, scale, linewidth, color)

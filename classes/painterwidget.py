@@ -37,11 +37,13 @@ OpenGL.ERROR_CHECKING = True
 OpenGL.FULL_LOGGING = True
 from OpenGL.GL import *
 
-from .items.base_item import BaseItem
+from .items.item import Item
 from .items.coord_system import CoordSystem
 from .items.ortho_line_grid import OrthoLineGrid
 from .items.star import Star
 from .items.text import Text
+from .items.arc import Arc
+from .items.circle import Circle
 from .items.gcode_path import GcodePath
 
 

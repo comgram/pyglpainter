@@ -25,9 +25,10 @@ import numpy as np
 import OpenGL
 from OpenGL.GL import *
 
-from .base_item import BaseItem
+from ..gcode_preprocessor import GcodePreprocessor
+from .item import Item
 
-class GcodePath(BaseItem):
+class GcodePath(Item):
     """
     @param label
     A string containing a unique name for this object
@@ -35,7 +36,7 @@ class GcodePath(BaseItem):
     @param prog_id
     OpenGL program ID (determines shaders to use) to use for this object
     
-    @param gcode
+    @param gcode_list
     A Python list of strings of G-codes to draw
     
     @param cwpos
@@ -55,17 +56,14 @@ class GcodePath(BaseItem):
     selected offset. This emulates the movement behavior of a classical
     CNC machine.
     """
-    def __init__(self, label, prog, gcode, cwpos, ccs, cs_offsets):
-        vertex_count = 2 * (len(gcode) + 1)
-        super(GcodePath, self).__init__(label, prog, vertex_count)
+    def __init__(self, label, prog_id, gcode_list, cwpos, ccs, cs_offsets):
+
+        super(GcodePath, self).__init__(label, prog_id, GL_LINE_STRIP, 2)
         
-        self.primitive_type = GL_LINE_STRIP
-        self.linewidth = 2
-        
-        self.gcode = gcode
-        self.cwpos = list(cwpos)
         self.ccs = ccs
         self.cs_offsets = cs_offsets
+        
+        self.position = list(cwpos)
         
         self.highlight_lines_queue = []
         
@@ -77,11 +75,26 @@ class GcodePath(BaseItem):
             self._re_axis_values.append(re.compile(".*" + axis + "([-.\d]+)"))
             
         self._re_contains_spindle = re.compile(".*S(\d+)")
-        self._re_comment_grbl = re.compile(".*;(?:_gerbil)\.(.*)")
+        self._re_comment_colorvalues_grbl = re.compile(".*_gerbil.color_begin\[(.*?),(.*?),(.*?)\]")
         self._re_allcomments_remove = re.compile(";.*")
         self._re_motion_mode = re.compile("G([0123])*([^\\d]|$)")
         self._re_distance_mode = re.compile("(G9[01])([^\d]|$)")
+
+        self.gcode = []
+        self.preprocessor = GcodePreprocessor()
+        self.preprocessor.position = list(self.position)
+        self.preprocessor.target = list(self.position)
+        for line in gcode_list:
+            self.preprocessor.set_line(line)
+            self.preprocessor.tidy()
+            self.preprocessor.parse_state()
             
+            lines = self.preprocessor.fractionize()
+            self.gcode += lines
+            self.preprocessor.done()
+
+        self.set_vertexcount(2 * len(self.gcode) + 1)
+
         self.render()
         self.upload()
         
@@ -112,15 +125,14 @@ class GcodePath(BaseItem):
         
         
     def render(self):
-        pos = self.cwpos # current position
         col = (1, 1, 1, 1)
-        cs = self.ccs # current coordinate system
-        offset = self.cs_offsets[cs] # current cs offset tuple
+
         current_motion_mode = 0
         distance_mode = "G90"
         spindle_speed = None
         
         in_arc = False # if currently in arc
+        comment_color = None # if current in color mode (_gerbil.color_begin comments)
         
         colors = {
             0: (.5, .5, .6, 1),
@@ -132,22 +144,16 @@ class GcodePath(BaseItem):
         diff = [0, 0, 0]
         
         # start of path
-        end = np.add(offset, pos)
-        self.append(tuple(end), col)
+        end = np.add(self.cs_offsets[self.ccs], self.position)
+        self.append_vertices([[tuple(end), col]])
         
         for line in self.gcode:
-            
-            # process special comments
-            m = re.match(self._re_comment_grbl, line)
-            # Detect if we're currently in an arc
-            if m:
-                comment = m.group(1)
-                # these comments are added by gerbil's preprocessor
-                if "arc_begin" in comment:
-                    in_arc = True
-                    
-                elif "arc_end" in comment:
-                    in_arc = False
+            # find colors in comments
+            if "color_begin" in line:
+                m = re.match(self._re_comment_colorvalues_grbl, line)
+                comment_color = (m.group(1), m.group(2), m.group(3), 1)
+            elif "color_end" in line:
+                comment_color = None
             
             # remove all comments
             line = re.sub(self._re_allcomments_remove, "", line)
@@ -156,37 +162,28 @@ class GcodePath(BaseItem):
             m = re.match(self._re_motion_mode, line)
             if m:
                 current_motion_mode = int(m.group(1))
-                if current_motion_mode == 2 or current_motion_mode == 3:
-                    print("G2 and G3 not supported. Use gerbil's preprocessor to fractionize a circle into small linear segements.")
                     
-                    
-            # update spindle speed / laser intensity
-            # select colors
+
+            # get spindle speed / laser intensity
             m = re.match(self._re_contains_spindle, line)
             if m:
                 spindle_speed = int(m.group(1))
-                print("SPINDLE {} {}".format(spindle_speed, line))
-            
-            if spindle_speed != None and spindle_speed > 0:
-                rgb = spindle_speed / 255.0
-                if in_arc == True:
-                    col = (rgb, rgb * 0.5, 0, 1) # yellow/reddish
-                else:
-                    col = (rgb, rgb * 0.9, 0, 1) # yellow
-            elif in_arc == True:
-                col = colors["arc"]
+
+            # select color from comment if present, else default color
+            if comment_color:
+                col = comment_color
             else:
                 col = colors[current_motion_mode]
-                print("COLOR {} {}".format(current_motion_mode, col))
 
+
+            # parse distance mode (absolute, relative)
             m = re.match(self._re_distance_mode, line)
             if m: distance_mode = m.group(1)
             
             # get current coordinate system G54-G59
             mcs = re.match("G(5[4-9]).*", line)
             if mcs: 
-                cs = "G" + mcs.group(1)
-                offset = cs_offsets[cs]
+                self.ccs = "G" + mcs.group(1)
 
             # parse X, Y, Z axis
             for i in range(0, 3):
@@ -197,15 +194,21 @@ class GcodePath(BaseItem):
                     a = float(m.group(1)) # axis value
                     if distance_mode == "G90":
                         # absolute
-                        pos[i] = a
+                        self.position[i] = a
                     else:
                         # relative
-                        pos[i] += a
+                        self.position[i] += a
 
             start = end
-            end = np.add(offset, pos)
+            end = np.add(self.cs_offsets[self.ccs], self.position)
             diff = np.subtract(end, start)
             
-            # generate 2 line segments per gcode for sharper color transitions when using spindle speed
-            self.append(start + diff * 0.001, col)
-            self.append(start + diff, (col[0], col[1], col[2], 0.3))
+            
+            color1 = col
+            if spindle_speed == None or spindle_speed == 0:
+                color2 = (col[0], col[1], col[2], 0.3)
+            else:
+                color2 = (0.3, 0.2, spindle_speed/255, 0.8) # blueish hue
+            
+            self.append_vertices([[start + diff * 0.001, color1]])
+            self.append_vertices([[start + diff, color2]])
