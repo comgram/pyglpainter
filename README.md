@@ -97,8 +97,7 @@ the world coordinates (0,0,0).
 
 ## TODO:
 
-* Turn this project into a standards-compliant Python module/package
-* Circle and Arc compound primitive made up from line segments
+* Turn this project into a more standards-compliant Python module/package
 * TRIANGLE_STRIP-based surface compund primitive
 * Support of more OpenGL features (textures, lights, etc.)
 
