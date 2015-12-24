@@ -83,7 +83,7 @@ class Text(Item):
         """
         
         letterpos = 0
-        letterspacing = 1
+        letterspacing = 0.5
         linepos = 0
         linespacing = 6
 

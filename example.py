@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 """
-pyglpainter - Copyright (c) 2015 Michael Franzl
+pyglp - Copyright (c) 2015 Michael Franzl
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import os
+import random
 import sys
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QVector3D
@@ -36,49 +37,97 @@ def main():
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    
-    painter = window.painter
+
+    p = window.painter
     
     # ============= CREATE PROGRAMS BEGIN =============
     path = os.path.dirname(os.path.realpath(__file__)) + "/shaders/"
-    painter.program_create("simple3d", path + "simple3d-vertex.c", path + "simple3d-fragment.c")
-    painter.program_create("simple2d", path + "simple2d-vertex.c", path + "simple2d-fragment.c")
+    p.program_create("simple3d", path + "simple3d-vertex.c", path + "simple3d-fragment.c")
+    p.program_create("simple2d", path + "simple2d-vertex.c", path + "simple2d-fragment.c")
     # ============= CREATE PROGRAMS END =============
     
 
     # ============= CREATE COMPOUND PRIMITIVES BEGIN =============
-    # CoordSystem class_args: scale, offset, hilight
-    mycs1 = painter.item_create("CoordSystem", "mycs1", "simple3d", (0,0,0), 120)
-    mycs2 = painter.item_create("CoordSystem", "mycs2", "simple3d", (400,400,0), 120, 2)
+    
+    # create a "ground" for better orientation
+    p.item_create("OrthoLineGrid", "mygrid1", "simple3d", (0,0), (1000,1000), 10)
+    
+
+    # create the main coordinate system with label
+    p.item_create("CoordSystem", "mycs1", "simple3d", (0,0,0), 100, 4)
+    mycs2 = p.item_create("CoordSystem", "mycs2", "simple3d", (100,300,0), 50, 2)
     mycs2.highlight(True)
+    i = p.item_create("Text", "mycslabel", "simple3d", "class CoordSystem", (0, 0, 0), 1)
+    i.billboard = True
+    i.billboard_axis = "Z"
     
-    # OrthoLineGrid class_args: (x1,y1), (x2,y2), offset, unit
-    mygrid1 = painter.item_create("OrthoLineGrid", "mygrid1", "simple3d", (0,0), (1000,1000), 10) 
     
-    # Star class_args: scale, origin
-    mystar1 = painter.item_create("Star", "mystar1", "simple3d", (10,0,0), 12)
-    mystar2 = painter.item_create("Star", "mystar2", "simple3d", (100,100,10), 12)
+    # draw a random cloud of stars with label
+    i = p.item_create("Text", "mystarlabel", "simple3d", "class Star", (60, 60, 60), 1, 1, (1,1,1,1))
+    i.billboard = True
+    for i in range(0,50):
+        x = random.randint(50,80)
+        y = random.randint(50,80)
+        z = random.randint(50,80)
+        s = random.randint(1,12)
+        p.item_create("Star", "mystar%d" % i, "simple3d", (x,y,z), s)
     
-    # Put text "G54" at the origin of mycs2 and set "billboard" mode
-    # Text will always face the camera, no matter from where you look
-    mytext1 = painter.item_create("Text", "mytext1", "simple3d", "G54", mycs2.origin_tuple, 7)
-    mytext1.billboard = True
     
     # Create static 2D overlay text at bottom left corder of window
-    mytext2 = painter.item_create("Text", "mytext2", "simple2d", "pyglpainter (c) 2015 Michael Franzl", (-0.95,-0.95,0), 0.01)
+    i = p.item_create("Text", "mytext2", "simple2d", "pyglpainter (c) 2015 Michael Franzl", (-0.95,-0.95,0), 0.01)
     
     
+    # Draw a 3D circular arc, aka. Helix
     is_clockwise = True
     use_triangles = True
     filled = False
-    myarc1 = painter.item_create("Arc", "myarc1", "simple3d", (-1,0,0), (-1,0,2), (1,0,1), 1, is_clockwise, use_triangles, filled, (0,0,0), 50)
+    i = p.item_create("Arc", "myarc1", "simple3d", (-1,0,0), (-1,0,2), (1,0,1), 1, is_clockwise, use_triangles, filled, (100,200,0), 40)
+    i = p.item_create("Text", "myarc1label", "simple3d", "class Arc (helix)", i.origin_tuple, 1)
+    i.billboard = True
+    i.billboard_axis = "Z"
     
     
+    # Draw a filled circle wedge
+    is_clockwise = True
+    use_triangles = True
+    filled = True
+    i = p.item_create("Arc", "myarc2", "simple3d", (-1,0,0), (0.7,0.7,0), (1,0,0), 1, is_clockwise, use_triangles, filled, (200,200,0), 40)
+    i = p.item_create("Text", "myarc2label", "simple3d", "class Arc (circle wedge filled)", i.origin_tuple, 1)
+    i.billboard = True
+    i.billboard_axis = "Z"
+    
+    
+    # Draw an arc from 1D line segments
+    is_clockwise = False
     use_triangles = True
     filled = False
-    mycircle1 = painter.item_create("Circle", "mycircle1", "simple3d", 1, use_triangles, filled, (20,0,0), 20)
+    i = p.item_create("Arc", "myarc3", "simple3d", (-1,0,0), (0.7,0.7,0), (1,0,0), 1, is_clockwise, use_triangles, filled, (300,200,0), 40)
+    i = p.item_create("Text", "myarc3label", "simple3d", "class Arc (triangles)", i.origin_tuple, 1)
+    i.billboard = True
+    i.billboard_axis = "Z"
     
-    # Plot CNC G-code relative to mycs2
+    
+    # Draw a circle made from 1D line segments
+    is_clockwise = False
+    use_triangles = False
+    filled = False
+    i = p.item_create("Circle", "mycircle1", "simple3d", 20, use_triangles, filled, (400,200,0), 1, 2, (.5,1,1,1))
+    i = p.item_create("Text", "mycircle1label", "simple3d", "class Circle (non-filled)", i.origin_tuple, 1)
+    i.billboard = True
+    i.billboard_axis = "Z"
+    
+    
+    # Draw a circle made from 1D line segments
+    is_clockwise = False
+    use_triangles = True
+    filled = True
+    i = p.item_create("Circle", "mycircle2", "simple3d", 20, use_triangles, filled, (500,200,0), 1, 2, (.5,1,1,1))
+    i = p.item_create("Text", "mycircle2label", "simple3d", "class Circle (filled)", i.origin_tuple, 1)
+    i.billboard = True
+    i.billboard_axis = "Z"
+    
+    
+    # Plot CNC G-code relative to mycs2 and put label
     gcodes = []
     gcodes.append("G0 X20 Y20")
     gcodes.append("G1 X30")
@@ -87,85 +136,105 @@ def main():
     gcodes.append("G2 X60 Y30 I5 J5")
     cs_offsets = {"G54": mycs2.origin_tuple }
     cs = "G54"
-    mygcode1 = painter.item_create("GcodePath", "mygcode1", "simple3d", gcodes, (0,0,0), "G54", cs_offsets)
+    mygcode1 = p.item_create("GcodePath", "mygcode1", "simple3d", gcodes, (0,0,0), "G54", cs_offsets)
+    i = p.item_create("Text", "mygcodelabel", "simple3d", "class GcodePath", mycs2.origin_tuple, 1)
+    i.billboard = True
+    i.billboard_axis = "Z"
     # ============= CREATE COMPOUND PRIMITIVES END =============
     
     
     
     # ============= CREATE RAW OPENGL PRIMITIVES BEGIN =============
     
-    # Create an arbitrary line strip -----------------------
+    # Create an arbitrary line strip plus label
     vertexcount = 4
-    mylinestrip1 = painter.item_create("Item", "mylinestrip1", "simple3d", GL_LINE_STRIP, 1, (0,0,0), 1, vertexcount)
+    i = p.item_create("Item", "mylinestrip1", "simple3d", GL_LINE_STRIP, 1, (200,300,1), 5, vertexcount)
     color = (0.7, 0.2, 0.2, 1)
-    mylinestrip1.append_vertices([[(100,100,1), color]])
-    mylinestrip1.append_vertices([[(150,150,1), color]])
-    mylinestrip1.append_vertices([[(220,150,1), color]])
-    mylinestrip1.append_vertices([[(130,100,1), color]])
-    mylinestrip1.upload()
+    i.append_vertices([[(0,0,0), color]])
+    i.append_vertices([[(10,0,0), color]])
+    i.append_vertices([[(0,10,0), color]])
+    i.append_vertices([[(10,10,0), color]])
+    i.upload()
+    i = p.item_create("Text", "linestriplabel", "simple3d", "class Item (GL_LINE_STRIP)", i.origin_tuple, 1)
+    i.billboard = True
+    i.billboard_axis = "Z"
     
-    # Create arbitrary lines -------------------------------
+    
+    # Create arbitrary lines plus label
     vertexcount = 4
-    mylines2 = painter.item_create("Item", "mylines2", "simple3d", GL_LINES, 1, (0,0,0), 1, vertexcount)
+    i = p.item_create("Item", "mylines2", "simple3d", GL_LINES, 1, (300,300,1), 5, vertexcount)
     color = (0.2, 0.7, 0.2, 1)
-    mylines2.append_vertices([[(200,100,1), color]])
-    mylines2.append_vertices([[(250,150,1), color]])
-    mylines2.append_vertices([[(320,150,1), color]])
-    mylines2.append_vertices([[(230,100,1), color]])
-    mylines2.upload()
+    i.append_vertices([[(0,0,0), color]])
+    i.append_vertices([[(10,0,0), color]])
+    i.append_vertices([[(0,10,0), color]])
+    i.append_vertices([[(10,10,0), color]])
+    i.upload()
+    i = p.item_create("Text", "lineslabel", "simple3d", "class Item (GL_LINES)", i.origin_tuple, 1)
+    i.billboard = True
+    i.billboard_axis = "Z"
     
-    # Create a fully camera-aligned billboard ---------------
+    
+    # Create a fully camera-aligned billboard plus label
     vertexcount = 4
-    myquad1 = painter.item_create("Item", "myquad1", "simple3d", GL_TRIANGLE_STRIP, 1, (0,0,0), 1, vertexcount)
-    myquad1.billboard = True
-    myquad1.billboard_axis = None
+    i = p.item_create("Item", "myquad1", "simple3d", GL_TRIANGLE_STRIP, 1, (400,0,0), 1, vertexcount)
+    i.billboard = True
+    i.billboard_axis = None
     col = (0.2, 0.7, 0.2, 1)
-    myquad1.append_vertices([[(0,0,0), col]])
-    myquad1.append_vertices([[(0,50,0), col]])
-    myquad1.append_vertices([[(50,0,0), col]])
-    myquad1.append_vertices([[(50,50,0), col]])
-    myquad1.set_origin((350, 100, 0))
-    myquad1.upload()
+    i.append_vertices([[(0,0,0), col]])
+    i.append_vertices([[(0,50,0), col]])
+    i.append_vertices([[(50,0,0), col]])
+    i.append_vertices([[(50,50,0), col]])
+    i.upload()
+    i = p.item_create("Text", "billboardlabel1", "simple3d", "class Item\n(Billboard fully\naligned)", i.origin_tuple, 2)
+    i.billboard = True
+    i.billboard_axis = None
     
     
     # Create a camera-aligned billboard restrained to rotation around Z axis
     vertexcount = 4
-    myquad2 = painter.item_create("Item", "myquad2", "simple3d", GL_TRIANGLE_STRIP, 2, (0,0,0), 1, vertexcount)
-    myquad2.billboard = True
-    myquad2.billboard_axis = "Z"
+    i = p.item_create("Item", "myquad2", "simple3d", GL_TRIANGLE_STRIP, 2, (400,300,0), 1, vertexcount)
+    i.billboard = True
+    i.billboard_axis = "Z"
     col = (0.7, 0.2, 0.7, 1)
-    myquad2.append_vertices([[(0,0,0), col]])
-    myquad2.append_vertices([[(0,50,0), col]])
-    myquad2.append_vertices([[(50,0,0), col]])
-    myquad2.append_vertices([[(50,50,0), col]])
-    myquad2.set_origin((350, 200, 0))
-    myquad2.upload()
+    i.append_vertices([[(0,0,0), col]])
+    i.append_vertices([[(0,50,0), col]])
+    i.append_vertices([[(50,0,0), col]])
+    i.append_vertices([[(50,50,0), col]])
+    i.upload()
+    i = p.item_create("Text", "billboardlabel2", "simple3d", "class Item\n(Billboard\nZ axis)", i.origin_tuple, 2)
+    i.billboard = True
+    i.billboard_axis = "Z"
+    
     
     # Create an arbitrary filled triangle with smooth colors
     vertexcount = 4
-    mytriangle2 = painter.item_create("Item", "mytriangle2", "simple3d", GL_TRIANGLE_STRIP, 1, (0,0,0), 1, vertexcount, True)
-    mytriangle2.append_vertices([[(400,100,1), (0.2, 0.7, 0.2, 1)]])
-    mytriangle2.append_vertices([[(450,150,1), (0.7, 0.2, 0.2, 1)]])
-    mytriangle2.append_vertices([[(520,150,1), (0.2, 0.2, 0.7, 1)]])
-    mytriangle2.append_vertices([[(520,150,70), (1, 1, 1, 0.2)]])
-    mytriangle2.upload()
+    i = p.item_create("Item", "mytriangle2", "simple3d", GL_TRIANGLE_STRIP, 1, (250,0,0), 1, vertexcount, True)
+    i.append_vertices([[(0,0,1), (0.2, 0.7, 0.2, 1)]])
+    i.append_vertices([[(50,50,1), (0.7, 0.2, 0.2, 1)]])
+    i.append_vertices([[(120,50,1), (0.2, 0.2, 0.7, 1)]])
+    i.append_vertices([[(120,50,70), (1, 1, 1, 0.2)]])
+    i.upload()
+    i = p.item_create("Text", "trianglelabel1", "simple3d", "class Item\n(GL_TRIANGLE_STRIP\nfilled)", i.origin_tuple, 1)
+    i.billboard = True
+    
+    
     
     # Create an 2D "overlay" triangle.
     # It uses a different shader and does not rotate with the world.
     vertexcount = 3
-    mytriangle3 = painter.item_create("Item", "mytriangle3", "simple2d", GL_TRIANGLES, 4, (0,0,0), 1, vertexcount)
-    mytriangle3.append_vertices([[(-0.9,-0.9,0), (1, 1, 1, 0.5)]])
-    mytriangle3.append_vertices([[(-0.8,-0.8,0), (1, 1, 1, 0.5)]])
-    mytriangle3.append_vertices([[(-0.8,-0.7,0), (1, 1, 1, 0.5)]])
-    mytriangle3.upload()
+    i = p.item_create("Item", "mytriangle3", "simple2d", GL_TRIANGLES, 4, (0,0,0), 1, vertexcount)
+    i.append_vertices([[(-0.9,-0.9,0), (1, 1, 1, 0.5)]])
+    i.append_vertices([[(-0.8,-0.8,0), (1, 1, 1, 0.5)]])
+    i.append_vertices([[(-0.8,-0.7,0), (1, 1, 1, 0.5)]])
+    i.upload()
     # ============= CREATE RAW OPENGL PRIMITIVES END =============
     
     
     
     # ===== UPDATE ITEMS (OPTIONAL) =====
     # move mystar1
-    mystar1.set_origin((50,50,50))
-    mystar2.set_scale(100)
+    # mystar1.set_origin((50,50,50))
+    # mystar2.set_scale(100)
     
     # highlight 2nd line of the gcode
     mygcode1.highlight_line(2)
@@ -173,7 +242,7 @@ def main():
     
     
     # ===== DELETE ITEMS (OPTIONAL) =====
-    painter.item_remove("mystar2")
+    #p.item_remove("mystar2")
     
     sys.exit(app.exec_())
     
