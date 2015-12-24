@@ -27,39 +27,43 @@ from .item import Item
 
 class OrthoLineGrid(Item):
     """
-    Draws a grid from individual lines. It can therefore not be filled.
+    Draws a 2-dimensional grid from individual lines useful for
+    coordinate systems or visualization of a 'ground'.
     
-    @param label
-    A string containing a unique name for this object
-        
-    @param prog_id
-    OpenGL program ID (determines shaders to use) to use for this object
-    
-    @param lower_left
-    Lower left corner in local coordinates
-    
-    @param upper_right
-    Upper right corner in local coordinates
-    
-    @param unit
-    At which intervals to draw a line
-    
-    @param origin
-    Origin of this item in world coordinates.
-    
-    @param scale
-    Default extent of this items is 1. Use this to modify.
-    
-    @param linewidth
-    Width of line in pixels.
-    
-    @param color
-    Color of this item
+    It can not be filled.
     """
     
     def __init__(self, label, prog,
                  lower_left, upper_right, unit,
                  origin=(0,0,0), scale=1, linewidth=1, color=(1,1,1,0.2)):
+        """
+        @param label
+        A string containing a unique name for this item.
+            
+        @param prog_id
+        OpenGL program ID (determines shaders to use) to use for this item.
+        
+        @param lower_left
+        Lower left corner in local coordinates.
+        
+        @param upper_right
+        Upper right corner in local coordinates.
+        
+        @param unit
+        At which intervals to draw a line.
+        
+        @param origin
+        Origin of this item in world space.
+        
+        @param scale
+        Scale of this item in world space.
+        
+        @param linewidth
+        Width of rendered lines in pixels.
+        
+        @param color
+        Color of this item.
+        """
         
         width = upper_right[0] - lower_left[0]
         height = upper_right[1] - lower_left[1]

@@ -29,26 +29,70 @@ from .item import Item
 
 class Arc(Item):
     """
-    xxx
+    Renders a circular arc or circle segment in the XY plane
+    by approximating it with line segments. Helix arcs along the Z axis
+    are supported.
     
-    @param label
-    A string containing a unique name for this object
-        
-    @param prog_id
-    OpenGL program ID (determines shaders to use) to use for this object
+    The initialization function defines an arc by start, end, and offset
+    of the center relative to start. This actually over-defines a circular
+    arc, so the user is responsible to do the correct 2D geometry math
+    themselves.
     
-    xxx
+    If start, end, and offset don't descibe a circular arc, a warning is
+    output, and the drawn result may be wrong.
     
-    @param origin
-    Origin of item in world coordinates.
-    
-    @param scale
-    Scale of item.
+    To simply draw a circle, use the more convenient Circle class instead.
     """
     
-    def __init__(self, label, prog_id, start, end, offset, radius, axis_1, axis_2, axis_linear, is_clockwise_arc, use_triangles, filled, origin=(0,0,0), scale=1, linewidth=1, color=(1,.5,1,1)):
+    def __init__(self, label, prog_id, start, end, offset, radius, is_clockwise_arc, use_triangles, filled, origin=(0,0,0), scale=1, linewidth=1, color=(1,.5,1,1)):
+        """
+        @param label
+        A string containing a unique name for this item.
+            
+        @param prog_id
+        OpenGL program ID (determines shaders to use) to use for this item.
         
-        positions = self.render(list(start), end, offset, radius, axis_1, axis_2, axis_linear, is_clockwise_arc)
+        @param start
+        The xyz start coordinate of the arc in local coordinates. 3-tuple.
+        
+        @param end
+        The xyz end coordinate of the arc in local coordinates. To draw a full
+        circle, set identical to `start`. 3-tuple.
+        
+        @param offset
+        The xyz offset of the center from the start point. 3-tuple.
+        
+        @param radius
+        The radius of the arc. Only used to calculate the number of
+        line segments to generate. The arc is fully defined by `start`,
+        `end`, and `offset`.
+        
+        @param is_clockwise_arc
+        There are two directions to draw an arc from `start` to `end`.
+        Set to True if the arc should be drawn clockwise, otherwise False.
+        
+        @param use_triangles
+        Set to True to draw a fillable circle wedge.
+        When False, draw the arc as 1D lines, not fillable.
+        
+        @param filled
+        Set to True to fill the circle wedge. `use_triangles` must be True
+        for this to have an effect.
+        
+        @param origin
+        Origin of this item in world space.
+        
+        @param scale
+        Scale of this item in world space.
+        
+        @param linewidth
+        Width of rendered lines in pixels.
+        
+        @param color
+        Color of this item.
+        """
+        
+        positions = self.render(list(start), end, offset, radius, 0, 1, 2, is_clockwise_arc)
         vertex_count = len(positions) + 1
         
         if use_triangles:

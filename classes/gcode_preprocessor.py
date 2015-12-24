@@ -25,41 +25,13 @@ import logging
 import math
 
 class GcodePreprocessor:
-    """ This class should receive all G-Code lines before they are sent out to the Grbl controller. It's main features are:
-    
-    * variable substitution (e.g. #1, #2 etc.)
-    * dynamic feed override
-    * code cleanup (comments, spaces, unsupported commands)
-    
-    Callbacks:
-    
-    on_preprocessor_feed_change
-    : Emitted when a F keyword is parsed from the G-Code.
-    : 1 argument: the feed rate in mm/min
-
-    on_preprocessor_var_undefined
-    : Emitted when a variable is to be substituted but no substitution value has been set previously.
-    : 1 argument: the key of the undefined variable
-    """
     
     def __init__(self):
-        self.logger = logging.getLogger('gerbil.preprocessor')
         self.line = ""
-        self.vars = {}
-        self.callback = self._default_callback
-        self.logger.info("Preprocessor Class Initialized")
-        
-        self.do_feed_override = False
-        self.do_fractionize_lines = True
-        self.do_fractionize_arcs = True
 
-        self.fract_linear_segment_len = 0.5
+        self.do_fractionize_arcs = True
         
-        self.request_feed = None
-        self.feed_last = None
-        
-        # state information mirroring Grbl's
-        self.contains_feed = False
+        # state information
         self.current_distance_mode = "G90"
         self.current_motion_mode = 0
         self.current_plane_mode = "G17"
@@ -69,12 +41,6 @@ class GcodePreprocessor:
         
         self.radius = None
         self.contains_radius = False
-        
-        self.spindle = None
-        self.contains_spindle = False
-        
-        self.dist = 0 # distance that current command will travel
-        self.dists = [0, 0, 0] # in xyz
         
         # precompile regular expressions
         self._axes_regexps = []
@@ -92,10 +58,6 @@ class GcodePreprocessor:
         self._re_radius = re.compile(".*R([-.\d]+)")
         self._re_spindle = re.compile(".*S([-.\d]+)")
         
-        self._re_findall_vars = re.compile("#(\d)")
-        #self._re_var_replace = re.compile(r"#\d")
-        self._re_feed = re.compile(".*F([.\d]+)")
-        self._re_feed_replace = re.compile(r"F[.\d]+")
         self._re_motion_mode = re.compile("G([0123])*([^\\d]|$)")
         self._re_distance_mode = re.compile("(G9[01])([^\d]|$)")
         self._re_plane_mode = re.compile("(G1[789])([^\d]|$)")
@@ -116,33 +78,7 @@ class GcodePreprocessor:
             3: (1, 0.9, 0.7, 1), # red/yellowish
             }
         
-        
-        
-    def job_new(self):
-        """
-        Resets state information for a new job.
-        """
-        self.vars = {}
-        
-        
-    def onboot_init(self):
-        """
-        Call this after Grbl has booted. Mimics Grbl's internal state.
-        """
-        self.feed_last = None # After boot, Grbl's feed is not set.
-        self.callback("on_preprocessor_feed_change", self.feed_last)
-        
-    
-    def set_vars(self, vars):
-        """
-        Define variables and their substitution.
-        
-        @param vars
-        A dictionary containing variable names and values. E.g. {"1":3, "2":4}
-        """
-        self.vars = vars
-        
-        
+
     def set_line(self, line):
         self.line = line
         
@@ -169,12 +105,6 @@ class GcodePreprocessor:
         # parse G17, G18 and G19 and remember
         m = re.match(self._re_plane_mode, self.line)
         if m: self.current_plane_mode = m.group(1)
-            
-        # see if current line has F
-        m = re.match(self._re_feed, self.line)
-        self.contains_feed = True if m else False
-        if m:
-            self.feed_current = float(m.group(1))
         
         self._parse_distance_values()
         
@@ -182,17 +112,9 @@ class GcodePreprocessor:
         self.dist = math.sqrt(self.dists[0] * self.dists[0] + self.dists[1] * self.dists[1] + self.dists[2] * self.dists[2])
         
         
-        
-    
-    
     def fractionize(self):
         """
-        Breaks lines longer than a certain threshold into shorter segments.
-        
-        Also breaks circles into segments.
-        
-        This is useful for faster response times when stopping the stream
-        as well as for the dynamic feed adjustment feature of gerbil.
+        Breaks circles into segments.
         """
         result = []
            
@@ -217,63 +139,7 @@ class GcodePreprocessor:
             # loop over X, Y, Z axes
             if self.target[i] != None: # keep state
                 self.position[i] = self.target[i]
-    
-    def find_vars(self):
-        """
-        Parses all #1, #2, etc. variables in a G-Code line and populates the internal `vars` dict. After this function is done, the dict will not have any values set.
-        """
-        keys = re.findall(self._re_findall_vars, self.line)
-        for key in keys:
-            self.vars[key] = None
-        
-        
-    def substitute_vars(self):
-        """
-        Does actual #1, #2, etc. variable substitution based on the values previously stored in the `vars` dict. When a variable is to be substituted but no substitution value has been set previously in the `vars` dict, a callback "on_preprocessor_var_undefined" will be made and no substitution done. If this happens, it is an User error and the stream should be stopped.
-        """
-        keys = re.findall(self._re_findall_vars, self.line)
-        
-        for key in keys:
-            val = None
-            if key in self.vars:
-                val = self.vars[key]
-            
-            if val == None:
-                self.line = ""
-                self.callback("on_preprocessor_var_undefined", key)
-                return self.line
-            else:
-                self.line = self.line.replace("#" + key, val)
-                self.logger.info("SUBSTITUED VAR #{} -> {}".format(key, val))
-            
-        return self.line
-    
-        
-    def override_feed(self):
-        """
-        Optionally overrides feed dynamically. Set line first with `set_line`
-        """
-        if self.do_feed_override == False and self.contains_feed:
-            # Simiply update the UI for detected feed
-            if self.feed_last != self.feed_current:
-                self.callback("on_preprocessor_feed_change", self.feed_current)
-            self.feed_last = self.feed_current
-            
-            
-        if self.do_feed_override == True and self.request_feed:
-            if self.contains_feed:
-                # strip the original F setting
-                self.line = re.sub(self._re_feed_replace, "", self.line).strip()
-                
-                
-            if self.feed_last != self.request_feed:
-                self.line += "F{:0.1f}".format(self.request_feed)
-                self.feed_last = self.request_feed
-                self.logger.info("OVERRIDING FEED: " + str(self.feed_last))
-                print("OVERRIDING FEED: " + self.line)
-                self.callback("on_preprocessor_feed_change", self.feed_last)
-        return self.line
-    
+
     
     def _strip_unsupported(self):
         # This silently strips gcode unsupported by Grbl, but ONLY those commands that are safe to strip without making the program deviate from its original purpose. For example it is  safe to strip a tool change. All other encountered unsupported commands should be sent to Grbl nevertheless so that an error is raised. The user then can make an informed decision.
@@ -296,12 +162,14 @@ class GcodePreprocessor:
         self.line = self.line.replace(" ", "")
         
         
-    """
-    This function is a direct port of Grbl's C code into Python (gcode.c)
-    with slight refactoring for Python by Michael Franzl.
-    This function is copyright (c) Sungeun K. Jeon under GNU General Public License 3
-    """
+    
     def _fractionize_circular_motion(self):
+        """
+        This function is a direct port of Grbl's C code into Python (gcode.c)
+        with slight refactoring for Python by Michael Franzl.
+        This function is copyright (c) Sungeun K. Jeon under GNU General Public License 3
+        """
+    
         # implies self.current_motion_mode == 2 or self.current_motion_mode == 3
         
         if self.current_plane_mode == "G17":
@@ -531,11 +399,4 @@ class GcodePreprocessor:
                     self.dists[i] = float(m.group(1))
                     self.target[i] += self.dists[i]
 
-        
-        
-            
-        
-    
-
-    def _default_callback(self, status, *args):
-        print("PREPROCESSOR DEFAULT CALLBACK", status, args)
+ 

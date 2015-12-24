@@ -70,8 +70,8 @@ def main():
     
     is_clockwise = True
     use_triangles = True
-    filled = True
-    myarc1 = painter.item_create("Arc", "myarc1", "simple3d", (-1,0,0), (0,1,0), (1,0,0), 1, 0, 1, 2, is_clockwise, use_triangles, filled, (0,0,0), 50)
+    filled = False
+    myarc1 = painter.item_create("Arc", "myarc1", "simple3d", (-1,0,0), (-1,0,2), (1,0,1), 1, is_clockwise, use_triangles, filled, (0,0,0), 50)
     
     
     use_triangles = True

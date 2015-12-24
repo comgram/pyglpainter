@@ -110,12 +110,11 @@ class PainterWidget(QGLWidget):
     any more.
     
     TODO:
-    * Circle and Arc compound primitive made up from line segments
     * TRIANGLE_STRIP-based surface compund primitive
     * Support of more OpenGL features (textures, lights, etc.)
     """
     
-    __version__ = "0.1.0"
+    __version__ = "0.2.0"
     
     def __init__(self, parent=None):
         super(PainterWidget, self).__init__(parent)

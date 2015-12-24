@@ -34,7 +34,7 @@ from OpenGL.GL import *
 
 class Item():
     """
-    This class represents a separate object in 3D space.
+    This class represents a separate object/item in 3D space.
     
     It implements OpenGL per-object boilerplate functions.
     
@@ -43,7 +43,7 @@ class Item():
     
     It also has its own units of measurement determined by self.scale.
     
-    It can be rotated around its own origin by self.rotation_angle and
+    It can be rotated around its own local origin by self.rotation_angle and
     self.rotation_vector.
     
     An instance of this class knows how to
@@ -52,37 +52,41 @@ class Item():
       * upload CPU vertex data into the GPU fully or in part (substitute)
       * draw itself
       * remove itself
-      * calculate it's own Model matrix (optionally in "billboard" mode)
+      * calculate its own Model matrix (optionally in "billboard" mode)
       
-    You can use this class as it is for drawing raw OpenGL primitives.
+    You can use this class directly for drawing raw OpenGL primitives.
     
     You can subclass to implement composite primitives (see other classes
-    in this directory).
+    in this directory which inherit from it).
     """
     
-    def __init__(self, label, prog_id, primitive_type=GL_LINES, line_width=1, origin=(0,0,0), scale=1, vertexcount=0, filled=False):
+    def __init__(self, label, prog_id, primitive_type=GL_LINES, linewidth=1, origin=(0,0,0), scale=1, vertexcount=0, filled=False):
         """
         @param label
-        A string containing a unique name for this object
-        
+        A string containing a unique name for this item.
+            
         @param prog_id
-        OpenGL program ID (determines shaders to use) to use for this object
-        
-        @param vertexcount
-        xxx
-        
-        @param origin
-        Origin of item in world coordinates.
-        
-        @param scale
-        Scale of item.
+        OpenGL program ID (determines shaders to use) to use for this item.
         
         @param primitive_type
-        An integer constant GL_LINES, GL_LINE_STRIP, GL_TRINAGLES, GL_TRINAGLE_STRIP
-        etc.
+        An OpenGL integer GL_LINES, GL_LINE_STRIP, GL_TRINAGLES,
+        GL_TRINAGLE_STRIP and others. See OpenGL documentation.
         
-        @param line_width
-        An integer giving the line width in pixels.
+        @param linewidth
+        Width of rendered lines in pixels.
+        
+        @param origin
+        Origin of this item in world space.
+        
+        @param scale
+        Scale of this item in world space.
+        
+        @param vertexcount
+        The maxiumum number of vertices supported by this item. If you
+        decide later that you want to add more vertices than specified
+        here, call `set_vertexcount()`. Remember that allocating CPU
+        and GPU memory for vertices are an expensive operation and should
+        be called only rarely.
         
         @param filled
         True or False. Determines if drawn triangles will be filled with color.
@@ -98,7 +102,7 @@ class Item():
         self.elementcount = 0 # current number of appended/used vertices
 
         self.primitive_type = primitive_type
-        self.linewidth = line_width
+        self.linewidth = linewidth
         self.filled = filled # if a triangle should be drawn filled
         
         # billboard mode
@@ -122,17 +126,21 @@ class Item():
         
         
     def __del__(self):
-        print("Item {}: deleting myself.".format(self.label))
+        """ Python's 'deconstructor'. Called when garbage collected.
+        """
+        print("Item {}: collecting my garbage.".format(self.label))
     
     
     def append_vertices(self, vertexdata):
         """
         Appends vertices, each defined with with position and color,
-        to CPU data storage but neither uploads to GPU nor draws them.
+        to CPU data storage but doesn't upload to the GPU. Once done with
+        appending all needed vertices, upload to the GPU by calling
+        `upload()`.
         
         @param vertexdata
-        A Python list. Each list element is a list [position, color]
-        where position is a 3-tuple and color is a 4-tuple.
+        A Python list. Each list element is a list `[position, color]`
+        where `position` is a 3-tuple and `color` is a 4-tuple.
         
         """
         length_to_append = len(vertexdata)
@@ -163,19 +171,19 @@ class Item():
             
     def substitute(self, vertex_nr, pos, col):
         """
-        If your object contains a very large vertex count, it may be more
+        If your object has very many vertices, it may be more
         efficient to substitute data directly on the GPU instead of
-        re-uploading everything. Use this to modify data.
+        re-uploading everything. Use this funtion to modify data
+        directly in the GPU.
         
         @param vertex_nr
-        Number of vertex to substitute
+        Number of vertex to substitute.
         
         @param pos
-        3-tuple of floats. Position to substitue for specified vertex
+        3-tuple of floats. Position to substitue for specified vertex.
         
         @params col
-        4-tuple of RGBA color. Color to substitute for specified vertex
-        
+        4-tuple of RGBA color. Color to substitute for specified vertex.
         """
         stride = self.data.strides[0]
         position_size = self.data.dtype["position"].itemsize
@@ -196,7 +204,7 @@ class Item():
     
     def remove(self):
         """
-        Removes self from the scene. The object will disappear.
+        Removes self. The object will disappear from the world.
         """
         glDeleteBuffers(1, [self.vbo])
         glDeleteVertexArrays(1, [self.vao])
@@ -208,8 +216,10 @@ class Item():
         """
         This method will upload the entire CPU vertex data to the GPU.
         
-        Call this once after all the CPU data have been set with append().
-        Note that uploading 
+        Call this once after all the CPU data have been set with
+        `append_vertices()`. Note that uploading a large set of data
+        is an expensive operation. To modify data, call `substitute()`
+        instead.
         """
         glBindVertexArray(self.vao)
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
@@ -256,7 +266,7 @@ class Item():
         
     def draw(self, viewmatrix_inverted=None):
         """
-        Draws this object. Call this from within paintGL().
+        Draws this object. Call this from within `paintGL()`.
         
         @param viewmatrix_inverted
         The inverted View matrix. It contains Camera position and angles.
@@ -304,21 +314,21 @@ class Item():
         If self.billboard == True and self.billboard_axis == None
         the Model matrix will also be rotated so that the local Z axis
         will face the camera and the local Y axis will be parallel to
-        the camera up axis.
+        the camera up axis at all times.
         
         If self.billboard == True and self.billboard_axis is either "X",
         "Y", or "Z", the local Z axis will always face the camera, but
-        the rotation will be restricted to billboard_axis.
+        the items rotation will be restricted to self.billboard_axis.
         
         @param viewmatrix_inv
-        The inverted View matrix as class QMatrix4x4. Mandatory when
+        The inverted View matrix as instance of QMatrix4x4. Mandatory when
         self.billboard == True, otherwise optional.
         """
         mat_m = QMatrix4x4()
         mat_m.translate(self.origin)
         
         if self.billboard:
-            # billboard calulation based on excellent tutorial:
+            # Billboard calulation is based on excellent tutorial:
             # http://nehe.gamedev.net/article/billboarding_how_to/18011/
             
             # extract 2nd column which is camera up vector
@@ -335,11 +345,11 @@ class Item():
             bill_look.normalize()
             
             if self.billboard_axis == None:
-                # Fully aligned billboard, not restricted in axis
-                # calculate new self right vector based upon self look and camera up
+                # Fully aligned billboard, rotation not restricted to axes.
+                # Calculate new self right vector based upon self look and camera up
                 bill_right = QVector3D.crossProduct(cam_up, bill_look)
                 
-                # calculate self up vector based on self look and self right
+                # Calculate self up vector based on self look and self right
                 bill_up = QVector3D.crossProduct(bill_look, bill_right)
                 
             else:
@@ -360,13 +370,13 @@ class Item():
                 bill_right = QVector3D.crossProduct(bill_up, bill_look)
             
             # View and Model matrices are actually nicely structured!
-            # 1st column: right vector
-            # 2nd column: up vector
-            # 3rd column: look vector
-            # 4th column: position
+            # 1st column: camera right vector
+            # 2nd column: camera up vector
+            # 3rd column: camera look vector
+            # 4th column: camera position
             
-            # here we only overwrite right, up and look.
-            # Position is already there, and we don't have to change it.
+            # Here we only overwrite right, up and look.
+            # Position is already in the matrix, and we don't have to change it.
             mat_m[0,0] = bill_right[0]
             mat_m[1,0] = bill_right[1]
             mat_m[2,0] = bill_right[2]
@@ -405,7 +415,7 @@ class Item():
     def qt_mat_to_list(mat):
         """
         Transforms a QMatrix4x4 into a one-dimensional Python list
-        in row-major order.
+        in row-major order, suitable to upload into the GPU.
         
         @param mat
         Matrix of type QMatrix4x4

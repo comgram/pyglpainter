@@ -27,24 +27,27 @@ from .item import Item
 
 class CoordSystem(Item):
     """
-    Draws a classical XYZ coordinate system with colors RGB.
-    
-    @param label
-    A string containing a unique name for this object
-        
-    @param prog_id
-    OpenGL program ID (determines shaders to use) to use for this object
-    
-    @param origin
-    The position of the CS in world coordinates
-    
-    @param scale
-    The axes of the CS are length 1. Use `scale` to scale
-    
-    @param linewidth
-    The line width in pixels
+    Draws a classical XYZ coordinate system with axis X as red, Y as green
+    and Z as blue. Length of axes is 1.
     """
+    
     def __init__(self, label, prog_id, origin=(0,0,0), scale=10, linewidth=1):
+        """
+        @param label
+        A string containing a unique name for this item.
+            
+        @param prog_id
+        OpenGL program ID (determines shaders to use) to use for this item.
+        
+        @param origin
+        Origin of this item in world space.
+        
+        @param scale
+        Scale of this item in world space.
+        
+        @param linewidth
+        Width of rendered lines in pixels.
+        """
         
         vertex_count = 6
         super(CoordSystem, self).__init__(label, prog_id, GL_LINES, linewidth, origin, scale, vertex_count)
@@ -61,7 +64,9 @@ class CoordSystem(Item):
 
     def highlight(self, val):
         """
-        Make a gradient towards white, towards the center
+        Visually highlight this coordinate system.
+        
+        Create a gradient towards white, towards the center
         
         @val
         True or False
