@@ -125,17 +125,19 @@ class GcodePath(Item):
         
     def draw(self, viewmatrix=None):
         for line_number in self._lines_to_highlight:
+            if 2 * line_number > self.elementcount: continue
+        
             # Substitute color of highlighted lines directly in the GPU.
-            stride = self.data.strides[0]
-            position_size = self.data.dtype["position"].itemsize
-            color_size = self.data.dtype["color"].itemsize
+            stride = self.vdata_pos_col.strides[0]
+            position_size = self.vdata_pos_col.dtype["position"].itemsize
+            color_size = self.vdata_pos_col.dtype["color"].itemsize
             
             # 2 opengl segments for each logical line, see below
             offset = 2 * line_number * stride + position_size
             
             col = np.array([1, 1, 1, 0.8], dtype=np.float32)
             
-            glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+            glBindBuffer(GL_ARRAY_BUFFER, self.vbo_pos_col)
             glBufferSubData(GL_ARRAY_BUFFER, offset, color_size, col)
             
         del self._lines_to_highlight[:]
@@ -157,10 +159,10 @@ class GcodePath(Item):
         """
         
         colors = {
-            0: (.5, .5, .6, 1),
-            1: (.7, .7, 1, 1),
-            2: (0.7, 1, 0.8, 1),
-            3: (.9, .7, 0.9, 1),
+            0: (.5, .5, .5, 1),  # grey
+            1: (.7, .7, 1, 1),   # blue/purple
+            2: (1, 0.7, 0.8, 1), # redish
+            3: (1, 0.9, 0.7, 1), # red/yellowish
             }
         col = colors[0] # initial color
 

@@ -28,6 +28,8 @@ import sys
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QVector3D
 
+import numpy as np
+
 import OpenGL
 from OpenGL.GL import *
 
@@ -226,6 +228,19 @@ def main():
     i.append_vertices([[(-0.9,-0.9,0), (1, 1, 1, 0.5)]])
     i.append_vertices([[(-0.8,-0.8,0), (1, 1, 1, 0.5)]])
     i.append_vertices([[(-0.8,-0.7,0), (1, 1, 1, 0.5)]])
+    i.upload()
+    
+    
+    dat = np.zeros(4, [("position", np.float32, 3), ("color", np.float32, 4)])
+    dat["position"][0] = [0,0,1]
+    dat["position"][1] = [100,0,1]
+    dat["position"][2] = [0,100,20]
+    dat["position"][3] = [100,100,1]
+    dat["color"][0] = [1, 1, 1, 1]
+    dat["color"][1] = [1, 1, 1, 1]
+    dat["color"][2] = [1, 1, 1, 1]
+    dat["color"][3] = [1, 1, 1, 1]
+    i = p.item_create("HeightMap", "myheightmap", "simple3d", 2, 2, dat)
     i.upload()
     # ============= CREATE RAW OPENGL PRIMITIVES END =============
     

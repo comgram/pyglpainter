@@ -23,21 +23,27 @@ OTHER DEALINGS IN THE SOFTWARE.
 import OpenGL
 from OpenGL.GL import *
 
+import numpy as np
+
 from .item import Item
 
-class CoordSystem(Item):
+class HeightMap(Item):
     """
-    Draws a classical XYZ coordinate system with axis X as red, Y as green
-    and Z as blue. Length of axes is 1.
+    xxx
     """
     
-    def __init__(self, label, prog_id, origin=(0,0,0), scale=10, linewidth=1):
+    def __init__(self, label, prog,
+                 nodes_x, nodes_y, pos_col,
+                 origin=(0,0,0), scale=1, linewidth=1, color=(1,1,1,0.2)):
         """
         @param label
         A string containing a unique name for this item.
             
         @param prog_id
         OpenGL program ID (determines shaders to use) to use for this item.
+        
+        @param positions
+        List of 3-tuples of node positions
         
         @param origin
         Origin of this item in world space.
@@ -47,38 +53,39 @@ class CoordSystem(Item):
         
         @param linewidth
         Width of rendered lines in pixels.
+        
+        @param color
+        Color of this item.
         """
+
+        self.nodes_x = nodes_x
+        self.nodes_y = nodes_y
         
-        vertex_count = 6
-        super(CoordSystem, self).__init__(label, prog_id, GL_LINES, linewidth, origin, scale, vertex_count)
+        super(HeightMap, self).__init__(label, prog, GL_TRIANGLE_STRIP, linewidth, origin, scale, 0)
         
-        self.append_vertices([[(0, 0, 0), (.6, .0, .0, 1.0)]])
-        self.append_vertices([[(1, 0, 0), (.6, .0, .0, 1.0)]])
-        self.append_vertices([[(0, 0, 0), (.0, .6, .0, 1.0)]])
-        self.append_vertices([[(0, 1, 0), (.0, .6, .0, 1.0)]])
-        self.append_vertices([[(0, 0, 0), (.0, .0, .6, 1.0)]])
-        self.append_vertices([[(0, 0, 1), (.0, .0, .6, 1.0)]])
-            
-        self.upload()
+        glPrimitiveRestartIndex(self.nodes_x * self.nodes_y)
+        
+        self.calculate_indices(nodes_x, nodes_y)
+        print("XXXXXXXXXXXXXXXXXX", self.vdata_indices)
+        
+        self.vdata_pos_col = pos_col
+        self.elementcount = pos_col.size
+
+
+    def calculate_indices(self, nx, ny):
+        size = 2 * nx * (ny-1) + ny - 2
+        self.vdata_indices = np.zeros(size, dtype=np.int32)
+        
+        j = 0
+        for y in range(0, ny - 1):
+            for x in range(0, nx):
+                self.vdata_indices[j] = y * nx + x
+                j += 1
+                self.vdata_indices[j] = (y + 1) * nx + x
+                j += 1
+            if y < (ny - 2):
+                self.vdata_indices[j] = nx * ny
+                j += 1
+        
         
 
-    def highlight(self, val):
-        """
-        Visually highlight this coordinate system.
-        
-        Create a gradient towards white, towards the center
-        
-        @val
-        True or False
-        """
-        for x in range(0,3):
-            col = self.vdata_pos_col["color"][x * 2 + 1]
-            if val == True:
-                newcol = (1, 1, 1, 1)
-            else:
-                newcol = (0, 0, 0, 1)
-                
-            self.vdata_pos_col["color"][x * 2] = newcol
-
-        self.upload()
-        self.dirty = True

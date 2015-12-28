@@ -45,6 +45,7 @@ from .items.text import Text
 from .items.arc import Arc
 from .items.circle import Circle
 from .items.gcode_path import GcodePath
+from .items.height_map import HeightMap
 
 
 class PainterWidget(QGLWidget):

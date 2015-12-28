@@ -92,8 +92,12 @@ class Item():
         True or False. Determines if drawn triangles will be filled with color.
         """
         
-        self.vbo = glGenBuffers(1) # VertexBuffer ID
-        self.vao = glGenVertexArrays(1) # VertexArray ID
+        # generate attribute state label aka VAO
+        self.vao = glGenVertexArrays(1)
+        
+        # generate data buffer labels aka VBO
+        self.vbo_pos_col = glGenBuffers(1) # this buffer labels positions+colors
+        self.vbo_indices = glGenBuffers(1) # VertexBuffer ID for indices
         
         self.program_id = prog_id # the program/shader to use
         self.label = label
@@ -121,8 +125,12 @@ class Item():
         
         self.dirty = True
 
-        # The CPU vertex data buffer is managed with numpy
-        self.data = np.zeros(self.vertexcount, [("position", np.float32, 3), ("color", np.float32, 4)])
+        # positions and color
+        self.vdata_pos_col = np.zeros(self.vertexcount, [("position", np.float32, 3), ("color", np.float32, 4)])
+        
+        self.vdata_indices = None
+        
+        self.setup_vao()
         
         
     def __del__(self):
@@ -130,6 +138,30 @@ class Item():
         """
         print("Item {}: collecting my garbage.".format(self.label))
     
+    
+    def setup_vao(self):
+        stride = self.vdata_pos_col.strides[0]
+        
+        glBindVertexArray(self.vao)
+        
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo_pos_col)
+
+        offset_pos = ctypes.c_void_p(0)
+        loc_pos = glGetAttribLocation(self.program_id, "position")
+        glEnableVertexAttribArray(loc_pos)
+        glVertexAttribPointer(loc_pos, 3, GL_FLOAT, False, stride, offset_pos)
+
+        offset_col = ctypes.c_void_p(self.vdata_pos_col.dtype["position"].itemsize)
+        loc_col = glGetAttribLocation(self.program_id, "color")
+        glEnableVertexAttribArray(loc_col)
+        glVertexAttribPointer(loc_col, 4, GL_FLOAT, False, stride, offset_col)
+        
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_indices)
+        #glEnable(GL_PRIMITIVE_RESTART)
+        #glPrimitiveRestartIndex(self.nodes_x * self.nodes_y)
+        
+        #glBindVertexArray(0) # we don't unbind for derivative classes who may set some more states
+        
     
     def append_vertices(self, vertexdata):
         """
@@ -148,8 +180,8 @@ class Item():
             raise IndexError("Item '{}': You are trying to append more vertices for item than the maximum of {}. Use set_vertexcount to increase the maximum possible vertices.".format(self.label, self.vertexcount))
         
         for vertex in vertexdata:
-            self.data["position"][self.elementcount] = vertex[0]
-            self.data["color"][self.elementcount] = vertex[1]
+            self.vdata_pos_col["position"][self.elementcount] = vertex[0]
+            self.vdata_pos_col["color"][self.elementcount] = vertex[1]
             self.elementcount += 1
 
 
@@ -164,7 +196,7 @@ class Item():
         if new_count > self.vertexcount:
             self.vertexcount = new_count
             extension = np.zeros(new_count, [("position", np.float32, 3), ("color", np.float32, 4)])
-            self.data = np.append(self.data, extension)
+            self.vdata_pos_col = np.append(self.vdata_pos_col, extension)
         else:
             raise BufferError("Item '{}': You are trying to set a vertex count lower than has been reserved during initialization. This isn't yet supported. User a lower count during initialization instead.".format(self.label, self.vertexcount))
             
@@ -185,11 +217,13 @@ class Item():
         @params col
         4-tuple of RGBA color. Color to substitute for specified vertex.
         """
-        stride = self.data.strides[0]
-        position_size = self.data.dtype["position"].itemsize
-        color_size = self.data.dtype["color"].itemsize
+        if vertex_nr > self.elementcount: return
+    
+        stride = self.vdata_pos_col.strides[0]
+        position_size = self.vdata_pos_col.dtype["position"].itemsize
+        color_size = self.vdata_pos_col.dtype["color"].itemsize
         
-        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo_pos_col)
         
         # replace position
         position = np.array([pos[0], pos[1], pos[2]], dtype=np.float32)
@@ -206,10 +240,14 @@ class Item():
         """
         Removes self. The object will disappear from the world.
         """
-        glDeleteBuffers(1, [self.vbo])
+        glDeleteBuffers(1, [self.vbo_pos_col])
         glDeleteVertexArrays(1, [self.vao])
         self.dirty = True
         print("Item {}: removing myself.".format(self.label))
+        
+        
+    def set_indices(self, count):
+        self.vdata_indices = np.zeros(count, [("position", np.int32, 1)])
         
         
     def upload(self):
@@ -222,24 +260,13 @@ class Item():
         instead.
         """
         glBindVertexArray(self.vao)
-        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
-        glBufferData(GL_ARRAY_BUFFER, self.data.nbytes, self.data, GL_DYNAMIC_DRAW)
         
-        print("Item {}: uploading {} bytes.".format(self.label, self.data.nbytes))
-        stride = self.data.strides[0]
+        glBufferData(GL_ARRAY_BUFFER, self.vdata_pos_col.nbytes, self.vdata_pos_col, GL_DYNAMIC_DRAW)
         
-        offset = ctypes.c_void_p(0)
-        loc = glGetAttribLocation(self.program_id, "position")
-        glEnableVertexAttribArray(loc)
-        glVertexAttribPointer(loc, 3, GL_FLOAT, False, stride, offset)
-
-        offset = ctypes.c_void_p(self.data.dtype["position"].itemsize)
-        loc = glGetAttribLocation(self.program_id, "color")
-        glEnableVertexAttribArray(loc)
-        glVertexAttribPointer(loc, 4, GL_FLOAT, False, stride, offset)
+        # upload indices
+        if self.vdata_indices != None:
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.vdata_indices.nbytes, self.vdata_indices, GL_STATIC_DRAW)
         
-        # unbind (not strictly neccessary)
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
         
         
@@ -289,16 +316,11 @@ class Item():
         loc_mat_m = glGetUniformLocation(self.program_id, "mat_m")
         glUniformMatrix4fv(loc_mat_m, 1, GL_TRUE, mat_m)
         
-        # bind VBO and VAO
-        glBindVertexArray(self.vao)
-        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
         
-        # actual draw command
+        # At this point, the actual drawing is simple!
+        glBindVertexArray(self.vao)
         glLineWidth(self.linewidth)
         glDrawArrays(self.primitive_type, 0, self.elementcount)
-        
-        # unbind VBO and VAO, not strictly neccessary
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
         
         self.dirty = False
