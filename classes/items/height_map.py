@@ -60,11 +60,12 @@ class HeightMap(Item):
 
         self.nodes_x = nodes_x
         self.nodes_y = nodes_y
+        
         self.vbo_indices = glGenBuffers(1) # VertexBuffer ID for indices
         
         super(HeightMap, self).__init__(label, prog, GL_TRIANGLE_STRIP, linewidth, origin, scale)
         
-        self.calculate_indices(nodes_x, nodes_y)
+        self.calculate_indices()
         print("Indices for item:", self.label, self.vdata_indices)
 
         self.vdata_pos_col = pos_col
@@ -86,7 +87,10 @@ class HeightMap(Item):
         glBindVertexArray(0)
         
 
-    def calculate_indices(self, nx, ny):
+    def calculate_indices(self):
+        nx = self.nodes_x
+        ny = self.nodes_y
+        
         size = 2 * nx * (ny-1) + ny - 2
         self.vdata_indices = np.zeros(size, dtype=np.int32)
         
