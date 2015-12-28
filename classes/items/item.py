@@ -60,7 +60,7 @@ class Item():
     in this directory which inherit from it).
     """
     
-    def __init__(self, label, prog_id, primitive_type=GL_LINES, linewidth=1, origin=(0,0,0), scale=1, vertexcount=0, filled=False):
+    def __init__(self, label, prog_id, primitive_type=GL_LINES, linewidth=1, origin=(0,0,0), scale=1, vertexcount_max=0, filled=False):
         """
         @param label
         A string containing a unique name for this item.
@@ -81,10 +81,10 @@ class Item():
         @param scale
         Scale of this item in world space.
         
-        @param vertexcount
+        @param vertexcount_max
         The maxiumum number of vertices supported by this item. If you
         decide later that you want to add more vertices than specified
-        here, call `set_vertexcount()`. Remember that allocating CPU
+        here, call `set_vertexcount_max()`. Remember that allocating CPU
         and GPU memory for vertices are an expensive operation and should
         be called only rarely.
         
@@ -97,13 +97,12 @@ class Item():
         
         # generate data buffer labels aka VBO
         self.vbo_pos_col = glGenBuffers(1) # this buffer labels positions+colors
-        self.vbo_indices = glGenBuffers(1) # VertexBuffer ID for indices
         
         self.program_id = prog_id # the program/shader to use
         self.label = label
 
-        self.vertexcount = vertexcount # maximum number of vertices
-        self.elementcount = 0 # current number of appended/used vertices
+        self.vertexcount_max = vertexcount_max # maximum number of vertices
+        self.vertexcount = 0 # current number of appended/used vertices
 
         self.primitive_type = primitive_type
         self.linewidth = linewidth
@@ -126,9 +125,7 @@ class Item():
         self.dirty = True
 
         # positions and color
-        self.vdata_pos_col = np.zeros(self.vertexcount, [("position", np.float32, 3), ("color", np.float32, 4)])
-        
-        self.vdata_indices = None
+        self.vdata_pos_col = np.zeros(self.vertexcount_max, [("position", np.float32, 3), ("color", np.float32, 4)])
         
         self.setup_vao()
         
@@ -145,7 +142,7 @@ class Item():
         glBindVertexArray(self.vao)
         
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo_pos_col)
-
+        
         offset_pos = ctypes.c_void_p(0)
         loc_pos = glGetAttribLocation(self.program_id, "position")
         glEnableVertexAttribArray(loc_pos)
@@ -156,11 +153,7 @@ class Item():
         glEnableVertexAttribArray(loc_col)
         glVertexAttribPointer(loc_col, 4, GL_FLOAT, False, stride, offset_col)
         
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_indices)
-        #glEnable(GL_PRIMITIVE_RESTART)
-        #glPrimitiveRestartIndex(self.nodes_x * self.nodes_y)
-        
-        #glBindVertexArray(0) # we don't unbind for derivative classes who may set some more states
+        glBindVertexArray(0)
         
     
     def append_vertices(self, vertexdata):
@@ -176,16 +169,16 @@ class Item():
         
         """
         length_to_append = len(vertexdata)
-        if self.elementcount + length_to_append > self.vertexcount:
-            raise IndexError("Item '{}': You are trying to append more vertices for item than the maximum of {}. Use set_vertexcount to increase the maximum possible vertices.".format(self.label, self.vertexcount))
+        if self.vertexcount + length_to_append > self.vertexcount_max:
+            raise IndexError("Item '{}': You are trying to append more vertices for item than the maximum of {}. Use set_vertexcount_max to increase the maximum possible vertices.".format(self.label, self.vertexcount_max))
         
         for vertex in vertexdata:
-            self.vdata_pos_col["position"][self.elementcount] = vertex[0]
-            self.vdata_pos_col["color"][self.elementcount] = vertex[1]
-            self.elementcount += 1
+            self.vdata_pos_col["position"][self.vertexcount] = vertex[0]
+            self.vdata_pos_col["color"][self.vertexcount] = vertex[1]
+            self.vertexcount += 1
 
 
-    def set_vertexcount(self, new_count):
+    def set_vertexcount_max(self, new_count):
         """
         Increase the CPU data buffer size to a value larger than the one
         set during initialization. This is an expensive operation.
@@ -193,12 +186,12 @@ class Item():
         @param new_count
         The new maximum number of supported vertices.
         """
-        if new_count > self.vertexcount:
-            self.vertexcount = new_count
+        if new_count > self.vertexcount_max:
+            self.vertexcount_max = new_count
             extension = np.zeros(new_count, [("position", np.float32, 3), ("color", np.float32, 4)])
             self.vdata_pos_col = np.append(self.vdata_pos_col, extension)
         else:
-            raise BufferError("Item '{}': You are trying to set a vertex count lower than has been reserved during initialization. This isn't yet supported. User a lower count during initialization instead.".format(self.label, self.vertexcount))
+            raise BufferError("Item '{}': You are trying to set a vertex count lower than has been reserved during initialization. This isn't yet supported. User a lower count during initialization instead.".format(self.label, self.vertexcount_max))
             
             
     def substitute(self, vertex_nr, pos, col):
@@ -217,7 +210,7 @@ class Item():
         @params col
         4-tuple of RGBA color. Color to substitute for specified vertex.
         """
-        if vertex_nr > self.elementcount: return
+        if vertex_nr > self.vertexcount: return
     
         stride = self.vdata_pos_col.strides[0]
         position_size = self.vdata_pos_col.dtype["position"].itemsize
@@ -246,10 +239,6 @@ class Item():
         print("Item {}: removing myself.".format(self.label))
         
         
-    def set_indices(self, count):
-        self.vdata_indices = np.zeros(count, [("position", np.int32, 1)])
-        
-        
     def upload(self):
         """
         This method will upload the entire CPU vertex data to the GPU.
@@ -262,10 +251,6 @@ class Item():
         glBindVertexArray(self.vao)
         
         glBufferData(GL_ARRAY_BUFFER, self.vdata_pos_col.nbytes, self.vdata_pos_col, GL_DYNAMIC_DRAW)
-        
-        # upload indices
-        if self.vdata_indices != None:
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.vdata_indices.nbytes, self.vdata_indices, GL_STATIC_DRAW)
         
         glBindVertexArray(0)
         
@@ -320,7 +305,7 @@ class Item():
         # At this point, the actual drawing is simple!
         glBindVertexArray(self.vao)
         glLineWidth(self.linewidth)
-        glDrawArrays(self.primitive_type, 0, self.elementcount)
+        glDrawArrays(self.primitive_type, 0, self.vertexcount)
         glBindVertexArray(0)
         
         self.dirty = False

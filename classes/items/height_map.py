@@ -60,17 +60,31 @@ class HeightMap(Item):
 
         self.nodes_x = nodes_x
         self.nodes_y = nodes_y
+        self.vbo_indices = glGenBuffers(1) # VertexBuffer ID for indices
         
-        super(HeightMap, self).__init__(label, prog, GL_TRIANGLE_STRIP, linewidth, origin, scale, 0)
-        
-        glPrimitiveRestartIndex(self.nodes_x * self.nodes_y)
+        super(HeightMap, self).__init__(label, prog, GL_TRIANGLE_STRIP, linewidth, origin, scale)
         
         self.calculate_indices(nodes_x, nodes_y)
-        print("XXXXXXXXXXXXXXXXXX", self.vdata_indices)
-        
-        self.vdata_pos_col = pos_col
-        self.elementcount = pos_col.size
+        print("Indices for item:", self.label, self.vdata_indices)
 
+        self.vdata_pos_col = pos_col
+        self.vertexcount = pos_col.size
+
+
+    def setup_vao(self):
+        super(HeightMap, self).setup_vao()
+        glBindVertexArray(self.vao)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_indices)
+        glPrimitiveRestartIndex(self.nodes_x * self.nodes_y)
+        glBindVertexArray(0)
+        
+        
+    def upload(self):
+        super(HeightMap, self).upload()
+        glBindVertexArray(self.vao)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.vdata_indices.nbytes, self.vdata_indices, GL_STATIC_DRAW)
+        glBindVertexArray(0)
+        
 
     def calculate_indices(self, nx, ny):
         size = 2 * nx * (ny-1) + ny - 2
@@ -86,6 +100,3 @@ class HeightMap(Item):
             if y < (ny - 2):
                 self.vdata_indices[j] = nx * ny
                 j += 1
-        
-        
-

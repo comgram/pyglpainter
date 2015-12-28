@@ -104,7 +104,7 @@ class GcodePath(Item):
             self.gcode += lines
             self.preprocessor.done()
 
-        self.set_vertexcount(2 * len(self.gcode) + 1)
+        self.set_vertexcount_max(2 * len(self.gcode) + 1)
 
         self.render()
         self.upload()
@@ -125,7 +125,7 @@ class GcodePath(Item):
         
     def draw(self, viewmatrix=None):
         for line_number in self._lines_to_highlight:
-            if 2 * line_number > self.elementcount: continue
+            if 2 * line_number > self.vertexcount: continue
         
             # Substitute color of highlighted lines directly in the GPU.
             stride = self.vdata_pos_col.strides[0]
