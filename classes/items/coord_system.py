@@ -50,7 +50,7 @@ class CoordSystem(Item):
         """
         
         vertex_count = 6
-        super(CoordSystem, self).__init__(label, prog_id, GL_LINES, linewidth, origin, scale, vertex_count)
+        super(CoordSystem, self).__init__(label, prog_id, GL_LINES, linewidth, origin, scale, False, vertex_count)
         
         self.append_vertices([[(0, 0, 0), (.6, .0, .0, 1.0)]])
         self.append_vertices([[(1, 0, 0), (.6, .0, .0, 1.0)]])

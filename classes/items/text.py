@@ -64,7 +64,7 @@ class Text(Item):
             j = ord(char)
             vertexcount_total += font.sizes[j]
             
-        super(Text, self).__init__(label, prog_id, GL_TRIANGLES, linewidth, origin, scale, vertexcount_total, True)
+        super(Text, self).__init__(label, prog_id, GL_TRIANGLES, linewidth, origin, scale, True, vertexcount_total)
         
         self.render(text, color)
         self.upload()

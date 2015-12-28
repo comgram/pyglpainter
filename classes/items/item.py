@@ -60,7 +60,7 @@ class Item():
     in this directory which inherit from it).
     """
     
-    def __init__(self, label, prog_id, primitive_type=GL_LINES, linewidth=1, origin=(0,0,0), scale=1, vertexcount_max=0, filled=False):
+    def __init__(self, label, prog_id, primitive_type=GL_LINES, linewidth=1, origin=(0,0,0), scale=1, filled=False, vertexcount_max=0):
         """
         @param label
         A string containing a unique name for this item.

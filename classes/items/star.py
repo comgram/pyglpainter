@@ -55,7 +55,7 @@ class Star(Item):
         Color of this item.
         """
         vertex_count = 6
-        super(Star, self).__init__(label, prog_id, GL_LINES, linewidth, origin, scale, vertex_count)
+        super(Star, self).__init__(label, prog_id, GL_LINES, linewidth, origin, scale, False, vertex_count)
         
         self.append_vertices([[(-.5, 0, 0), color]])
         self.append_vertices([[(1, 0, 0), color]])

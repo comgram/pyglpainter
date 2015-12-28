@@ -63,7 +63,7 @@ class HeightMap(Item):
         
         self.vbo_indices = glGenBuffers(1) # VertexBuffer ID for indices
         
-        super(HeightMap, self).__init__(label, prog, GL_TRIANGLE_STRIP, linewidth, origin, scale)
+        super(HeightMap, self).__init__(label, prog, GL_TRIANGLE_STRIP, linewidth, origin, scale, True)
         
         self.calculate_indices()
         print("Indices for item:", self.label, self.vdata_indices)

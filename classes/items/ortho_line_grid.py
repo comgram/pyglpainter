@@ -73,7 +73,7 @@ class OrthoLineGrid(Item):
         
         vertex_count = 2 * width_units + 2 * height_units
         
-        super(OrthoLineGrid, self).__init__(label, prog, GL_LINES, linewidth, origin, scale, vertex_count)
+        super(OrthoLineGrid, self).__init__(label, prog, GL_LINES, linewidth, origin, scale, False, vertex_count)
         
         for wu in range(0, width_units):
             x = unit * wu

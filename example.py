@@ -150,7 +150,7 @@ def main():
     
     # Create an arbitrary line strip plus label
     vertexcount = 4
-    i = p.item_create("Item", "mylinestrip1", "simple3d", GL_LINE_STRIP, 1, (200,300,1), 5, vertexcount)
+    i = p.item_create("Item", "mylinestrip1", "simple3d", GL_LINE_STRIP, 1, (200,300,1), 5, False, vertexcount)
     color = (0.7, 0.2, 0.2, 1)
     i.append_vertices([[(0,0,0), color]])
     i.append_vertices([[(10,0,0), color]])
@@ -164,7 +164,7 @@ def main():
     
     # Create arbitrary lines plus label
     vertexcount = 4
-    i = p.item_create("Item", "mylines2", "simple3d", GL_LINES, 1, (300,300,1), 5, vertexcount)
+    i = p.item_create("Item", "mylines2", "simple3d", GL_LINES, 1, (300,300,1), 5, False, vertexcount)
     color = (0.2, 0.7, 0.2, 1)
     i.append_vertices([[(0,0,0), color]])
     i.append_vertices([[(10,0,0), color]])
@@ -178,7 +178,7 @@ def main():
     
     # Create a fully camera-aligned billboard plus label
     vertexcount = 4
-    i = p.item_create("Item", "myquad1", "simple3d", GL_TRIANGLE_STRIP, 1, (400,0,0), 1, vertexcount)
+    i = p.item_create("Item", "myquad1", "simple3d", GL_TRIANGLE_STRIP, 1, (400,0,0), 1, False, vertexcount)
     i.billboard = True
     i.billboard_axis = None
     col = (0.2, 0.7, 0.2, 1)
@@ -194,7 +194,7 @@ def main():
     
     # Create a camera-aligned billboard restrained to rotation around Z axis
     vertexcount = 4
-    i = p.item_create("Item", "myquad2", "simple3d", GL_TRIANGLE_STRIP, 2, (400,300,0), 1, vertexcount)
+    i = p.item_create("Item", "myquad2", "simple3d", GL_TRIANGLE_STRIP, 2, (400,300,0), 1, False, vertexcount)
     i.billboard = True
     i.billboard_axis = "Z"
     col = (0.7, 0.2, 0.7, 1)
@@ -210,7 +210,7 @@ def main():
     
     # Create an arbitrary filled triangle with smooth colors
     vertexcount = 4
-    i = p.item_create("Item", "mytriangle2", "simple3d", GL_TRIANGLE_STRIP, 1, (250,0,0), 1, vertexcount, True)
+    i = p.item_create("Item", "mytriangle2", "simple3d", GL_TRIANGLE_STRIP, 1, (250,0,0), 1, True, vertexcount)
     i.append_vertices([[(0,0,1), (0.2, 0.7, 0.2, 1)]])
     i.append_vertices([[(50,50,1), (0.7, 0.2, 0.2, 1)]])
     i.append_vertices([[(120,50,1), (0.2, 0.2, 0.7, 1)]])
@@ -224,7 +224,7 @@ def main():
     # Create an 2D "overlay" triangle.
     # It uses a different shader and does not rotate with the world.
     vertexcount = 3
-    i = p.item_create("Item", "mytriangle3", "simple2d", GL_TRIANGLES, 4, (0,0,0), 1, vertexcount)
+    i = p.item_create("Item", "mytriangle3", "simple2d", GL_TRIANGLES, 4, (0,0,0), 1, False, vertexcount)
     i.append_vertices([[(-0.9,-0.9,0), (1, 1, 1, 0.5)]])
     i.append_vertices([[(-0.8,-0.8,0), (1, 1, 1, 0.5)]])
     i.append_vertices([[(-0.8,-0.7,0), (1, 1, 1, 0.5)]])
@@ -236,11 +236,11 @@ def main():
     dat["position"][1] = [100,0,1]
     dat["position"][2] = [0,100,20]
     dat["position"][3] = [100,100,1]
-    dat["color"][0] = [1, 1, 1, 1]
-    dat["color"][1] = [1, 1, 1, 1]
-    dat["color"][2] = [1, 1, 1, 1]
+    dat["color"][0] = [1, 0, 0, 1]
+    dat["color"][1] = [0, 1, 0, 1]
+    dat["color"][2] = [0, 0, 1, 0]
     dat["color"][3] = [1, 1, 1, 1]
-    i = p.item_create("HeightMap", "myheightmap", "simple3d", 2, 2, dat)
+    i = p.item_create("HeightMap", "myheightmap", "simple3d", 2, 2, dat, (100,0,0))
     i.upload()
     # ============= CREATE RAW OPENGL PRIMITIVES END =============
     

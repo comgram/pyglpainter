@@ -100,7 +100,7 @@ class Arc(Item):
         else:
             primitive_type = GL_LINE_STRIP
         
-        super(Arc, self).__init__(label, prog_id, primitive_type, linewidth, origin, scale, vertex_count, filled)
+        super(Arc, self).__init__(label, prog_id, primitive_type, linewidth, origin, scale, filled, vertex_count)
         
         if use_triangles:
             center = np.add(start, offset)
