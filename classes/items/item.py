@@ -133,7 +133,8 @@ class Item():
     def __del__(self):
         """ Python's 'deconstructor'. Called when garbage collected.
         """
-        print("Item {}: collecting my garbage.".format(self.label))
+        #print("Item {}: collecting my garbage.".format(self.label))
+        pass
     
     
     def setup_vao(self):

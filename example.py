@@ -231,17 +231,32 @@ def main():
     i.upload()
     
     
-    dat = np.zeros(4, [("position", np.float32, 3), ("color", np.float32, 4)])
-    dat["position"][0] = [0,0,1]
-    dat["position"][1] = [100,0,1]
-    dat["position"][2] = [0,100,20]
-    dat["position"][3] = [100,100,1]
-    dat["color"][0] = [1, 0, 0, 1]
-    dat["color"][1] = [0, 1, 0, 1]
-    dat["color"][2] = [0, 0, 1, 0]
-    dat["color"][3] = [1, 1, 1, 1]
-    i = p.item_create("HeightMap", "myheightmap", "simple3d", 2, 2, dat, (100,0,0))
+    grid_x = 30
+    grid_y = 20
+    
+    dat = np.zeros(grid_x * grid_y, [("position", np.float32, 3), ("color", np.float32, 4)])
+    
+    for y in range(0, grid_y):
+        for x in range(0, grid_x):
+            idx = y * grid_x + x
+            dat["position"][idx] = (x, y, 0)
+            print("XXX", idx, (x, y, 0))
+            dat["color"][idx] = (1, 1, 1, 1)
+          
+    print(dat)
+    
+    #dat["position"][0] = [0,0,1]
+    #dat["position"][1] = [100,0,1]
+    #dat["position"][2] = [0,100,20]
+    #dat["position"][3] = [100,100,1]
+    #dat["color"][0] = [1, 0, 0, 1]
+    #dat["color"][1] = [0, 1, 0, 1]
+    #dat["color"][2] = [0, 0, 1, 0]
+    #dat["color"][3] = [0, 0, 1, 1]
+    #print(dat)
+    i = p.item_create("HeightMap", "myheightmap", "simple3d", grid_x, grid_y, dat, False, (100,400,1), 10)
     i.upload()
+    #i.substitute(2, (0,100,100), (1, 1, 1, 1))
     # ============= CREATE RAW OPENGL PRIMITIVES END =============
     
     
