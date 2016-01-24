@@ -136,9 +136,6 @@ class PainterWidget(QGLWidget):
         self.width = None
         self.height = None
         
-        # This will contain instances of class Item (objects) in the scene
-        self.items = {}
-        
         # Rather than repainting the scene on each mouse event,
         # we repaint at fixed timer intervals.
         self.dirty = True
