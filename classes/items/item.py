@@ -132,6 +132,8 @@ class Item():
             self.vdata_indices = None
         
         self._loc_mat_m = glGetUniformLocation(self.program_id, "mat_m")
+        self._loc_pos = glGetAttribLocation(self.program_id, "position")
+        self._loc_col = glGetAttribLocation(self.program_id, "color")
         
         self.setup_vao()
         
@@ -151,14 +153,14 @@ class Item():
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo_pos_col)
         
         offset_pos = ctypes.c_void_p(0)
-        loc_pos = glGetAttribLocation(self.program_id, "position")
-        glEnableVertexAttribArray(loc_pos)
-        glVertexAttribPointer(loc_pos, 3, GL_FLOAT, False, stride, offset_pos)
+        
+        glEnableVertexAttribArray(self._loc_pos)
+        glVertexAttribPointer(self._loc_pos, 3, GL_FLOAT, False, stride, offset_pos)
 
         offset_col = ctypes.c_void_p(self.vdata_pos_col.dtype["position"].itemsize)
-        loc_col = glGetAttribLocation(self.program_id, "color")
-        glEnableVertexAttribArray(loc_col)
-        glVertexAttribPointer(loc_col, 4, GL_FLOAT, False, stride, offset_col)
+        
+        glEnableVertexAttribArray(self._loc_col)
+        glVertexAttribPointer(self._loc_col, 4, GL_FLOAT, False, stride, offset_col)
         
         if self.vdata_indices != None:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_indices)
@@ -295,6 +297,7 @@ class Item():
     def draw(self, viewmatrix_inverted=None):
         """
         Draws this object. Call this from within `paintGL()`.
+        Assumes that glUseProgram() has been called.
         
         @param viewmatrix_inverted
         The inverted View matrix. It contains Camera position and angles.
@@ -308,10 +311,6 @@ class Item():
             glPolygonMode( GL_FRONT_AND_BACK, GL_FILL )
         else:
             glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
-        
-        # this determines which shaders will be used
-        glUseProgram(self.program_id)
-        print("using program2", self.program_id)
         
         # upload Model matrix, accessible in the shader as variable mat_m
         mat_m = self.qt_mat_to_list(mat_m)

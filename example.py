@@ -261,7 +261,6 @@ def main():
     
     # highlight 2nd line of the gcode
     mygcode1.highlight_line(2)
-    mygcode1.draw()
     
     
     # ===== DELETE ITEMS (OPTIONAL) =====

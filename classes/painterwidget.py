@@ -326,7 +326,6 @@ class PainterWidget(QGLWidget):
         # then draw all items belonging to that program
         for key, prog_id in self._programs.items():
             glUseProgram(prog_id)
-            print("using program1", prog_id)
             
             # ======= VIEW MATRIX BEGIN ==========
             # start with an empty matrix
