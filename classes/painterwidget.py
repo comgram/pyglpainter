@@ -37,15 +37,7 @@ OpenGL.ERROR_CHECKING = True
 OpenGL.FULL_LOGGING = True
 from OpenGL.GL import *
 
-from .items.item import Item
-from .items.coord_system import CoordSystem
-from .items.ortho_line_grid import OrthoLineGrid
-from .items.star import Star
-from .items.text import Text
-from .items.arc import Arc
-from .items.circle import Circle
-from .items.gcode_path import GcodePath
-from .items.height_map import HeightMap
+from .program import Program
 
 
 class PainterWidget(QGLWidget):
@@ -140,13 +132,12 @@ class PainterWidget(QGLWidget):
         # we repaint at fixed timer intervals.
         self.dirty = True
         
-        
         # Setup our only and main timer
         self._timer = QTimer()
         self._timer.timeout.connect(self._timer_timeout)
 
         # contains OpenGL "programs" of different shaders
-        self._programs = {}
+        self.programs = {}
                 
         # Setup inital world Rotation states
         self._rotation_quat = QQuaternion() # to rotate the View matrix
@@ -194,7 +185,7 @@ class PainterWidget(QGLWidget):
 
     def program_create(self, label, vertex_filepath, fragment_filepath):
         """
-        Create a named OpenGL program, attach shaders to it, and remember.
+        Create a named OpenGL program.
         
         @param label
         A string containing a unique label for the program that can be
@@ -209,52 +200,7 @@ class PainterWidget(QGLWidget):
         A string containing the absolute filepath of the GLSL fragment shader
         source code.
         """
-        prog_id = glCreateProgram()
-        
-        # create vertex and fragment shaders which are temporary
-        vertex_id   = glCreateShader(GL_VERTEX_SHADER)
-        fragment_id = glCreateShader(GL_FRAGMENT_SHADER)
-        
-        # set the GLSL sources
-        with open(vertex_filepath, "r") as f: vertex_code = f.read()
-        with open(fragment_filepath, "r") as f: fragment_code = f.read()
-        
-        glShaderSource(vertex_id, vertex_code)
-        glShaderSource(fragment_id, fragment_code)
-        
-        # compile shaders
-        glCompileShader(vertex_id)
-        glCompileShader(fragment_id)
-        
-        compile_result = glGetShaderiv(vertex_id, GL_COMPILE_STATUS);
-        if (compile_result == 0):
-            raise RuntimeError("Error in Vertex Shader: " + str(glGetShaderInfoLog(vertex_id)))
-        
-        compile_result = glGetShaderiv(fragment_id, GL_COMPILE_STATUS);
-        if (compile_result == 0):
-            raise RuntimeError("Error in Fragment Shader: " + str(glGetShaderInfoLog(fragment_id)))
-        
-        # associate the shaders with the program
-        glAttachShader(prog_id, vertex_id)
-        glAttachShader(prog_id, fragment_id)
-        
-        # link the program
-        glLinkProgram(prog_id)
-        
-        # TODO: use glGetProgramiv to detect linker errors
-        
-        # once compiled and linked, the shaders are in the firmware
-        # and can be discarded from the application context
-        glDetachShader(prog_id, vertex_id)
-        glDetachShader(prog_id, fragment_id)
-        
-        self._programs[label] = {
-            "id": prog_id,
-            "loc_mat_v": glGetUniformLocation(prog_id, "mat_v"),
-            "loc_mat_p": glGetUniformLocation(prog_id, "mat_p"),
-            "items": {},
-            }
-        
+        self.programs[label] = Program(label, vertex_filepath, fragment_filepath)
         
         
     def item_create(self, class_name, item_label, program_label, *args):
@@ -275,14 +221,9 @@ class PainterWidget(QGLWidget):
         Arguments to pass to the initialization method of the given
         `class_name`. See item.py for the required arguments.
         """
-        if not item_label in self._programs[program_label]["items"]:
-            # create
-            prog_id = self._programs[program_label]["id"]
-            klss = self.str_to_class(class_name)
-            item = klss(item_label, prog_id, *args)
-            self._programs[program_label]["items"][item_label] = item
-        else:
-            item = self._programs[program_label]["items"][item_label]
+        prog = self.programs[program_label]
+        item = prog.item_create(class_name, item_label, *args)
+       
         return item
     
     
@@ -293,10 +234,10 @@ class PainterWidget(QGLWidget):
         @param item_label
         A string containing the unique label of the previously create item.
         """
-        if item_label in self._programs[program_label]["items"]:
-            item = self._programs[program_label]["items"][item_label]
+        if item_label in self.programs[program_label].items:
+            item = self.programs[program_label].items[item_label]
             item.remove()
-            del self._programs[program_label]["items"][item_label]
+            del self.programs[program_label].items[item_label]
         
 
     def paintGL(self):
@@ -326,13 +267,8 @@ class PainterWidget(QGLWidget):
         # loop over all programs/shaders
         # first switch to that program (expensive operation)
         # then draw all items belonging to that program
-        for key, obj in self._programs.items():
-            prog_id = obj["id"]
-            loc_mat_v = obj["loc_mat_v"]
-            loc_mat_p = obj["loc_mat_p"]
-            items = obj["items"]
-            
-            glUseProgram(prog_id)
+        for key, prog in self.programs.items():
+            glUseProgram(prog.id)
             
             # ======= VIEW MATRIX BEGIN ==========
             # start with an empty matrix
@@ -368,7 +304,7 @@ class PainterWidget(QGLWidget):
             # upload the View matrix into the GPU,
             # accessible to the vertex shader under the variable name "mat_v"
             mat_v_list = PainterWidget.qt_mat_to_list(self.mat_v) # Transform Qt object to Python list
-            glUniformMatrix4fv(loc_mat_v, 1, GL_TRUE, mat_v_list)
+            glUniformMatrix4fv(prog.loc_mat_v, 1, GL_TRUE, mat_v_list)
             # ======= VIEW MATRIX END ==========
             
             
@@ -377,25 +313,13 @@ class PainterWidget(QGLWidget):
             self.mat_p.perspective(self.fov, self.aspect, 0.1, 100000) # math is done by Qt!
             # ======= PROJECTION MATRIX END ==========
             
-            
             # upload the Projection matrix into the GPU,
             # accessible to the vertex shader under the variable name "mat_p"
             mat_p_list = PainterWidget.qt_mat_to_list(self.mat_p) #Transform Qt object to Python list
-            glUniformMatrix4fv(loc_mat_p, 1, GL_TRUE, mat_p_list)
+            glUniformMatrix4fv(prog.loc_mat_p, 1, GL_TRUE, mat_p_list)
             # ======= PROJECTION MATRIX END ==========
             
-            
-            # Draw items belonging to this program
-            for key, item in items.items():
-                # a draw call usually consists of
-                #   1. upload Model matrix to GPU
-                #   2. call glBindVertexArray()
-                #   3. call glBindBuffer()
-                #   4. call glDraw...()
-                
-                # "billboard" items need camera coordinates which are stored
-                # in the inverted View matrix
-                item.draw(self.mat_v_inverted)
+            prog.items_draw(self.mat_v_inverted)
       
         # nothing more to do here!
         # Swapping the OpenGL buffer is done automatically by Qt. See Qt documentation.
@@ -601,12 +525,6 @@ class PainterWidget(QGLWidget):
         """
         return math.acos(QVector3D.dotProduct(v1, v2) / (v1.length() * v2.length()))
     
-    
-    @staticmethod
-    def str_to_class(str):
-        return getattr(sys.modules[__name__], str)
-    
-
     @staticmethod
     def qt_mat_to_list(mat):
         """
