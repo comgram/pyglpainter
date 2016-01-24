@@ -311,6 +311,7 @@ class Item():
         
         # this determines which shaders will be used
         glUseProgram(self.program_id)
+        print("using program2", self.program_id)
         
         # upload Model matrix, accessible in the shader as variable mat_m
         mat_m = self.qt_mat_to_list(mat_m)
