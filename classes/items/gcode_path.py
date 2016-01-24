@@ -137,7 +137,7 @@ class GcodePath(Item):
             
             col = np.array([1, 1, 1, 0.8], dtype=np.float32)
             
-            glBindBuffer(GL_ARRAY_BUFFER, self.vbo_pos_col)
+            glBindBuffer(GL_ARRAY_BUFFER, self.vbo_array)
             glBufferSubData(GL_ARRAY_BUFFER, offset, color_size, col)
             
         del self._lines_to_highlight[:]

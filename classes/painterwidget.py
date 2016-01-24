@@ -251,27 +251,26 @@ class PainterWidget(QGLWidget):
         glDetachShader(prog_id, vertex_id)
         glDetachShader(prog_id, fragment_id)
         
-        # remember the program id for later
-        
         self._programs[label] = {
             "id": prog_id,
             "loc_mat_v": glGetUniformLocation(prog_id, "mat_v"),
             "loc_mat_p": glGetUniformLocation(prog_id, "mat_p"),
+            "items": {},
             }
         
         
         
-    def item_create(self, class_name, label, program_name, *args):
+    def item_create(self, class_name, item_label, program_label, *args):
         """ Creates an item and returns the object for further manipulation.
         
         @param class_name
         A string of the class name that should be instantiated and drawn.
         e.g. "Star", "CoordSystem" etc. See item.py for available classes.
         
-        @param label
+        @param item_label
         A string containing the unique label for this item.
         
-        @param program_name
+        @param program_label
         A string containing the label of a previously created program.
         The item will be rendered using this program/shaders.
         
@@ -279,28 +278,28 @@ class PainterWidget(QGLWidget):
         Arguments to pass to the initialization method of the given
         `class_name`. See item.py for the required arguments.
         """
-        if not label in self.items:
+        if not item_label in self._programs[program_label]["items"]:
             # create
-            prog_id = self._programs[program_name]["id"]
+            prog_id = self._programs[program_label]["id"]
             klss = self.str_to_class(class_name)
-            item = klss(label, prog_id, *args)
-            self.items[label] = item
+            item = klss(item_label, prog_id, *args)
+            self._programs[program_label]["items"][item_label] = item
         else:
-            item = self.items[label]
+            item = self._programs[program_label]["items"][item_label]
         return item
     
     
-    def item_remove(self, label):
+    def item_remove(self, item_label):
         """ Removes a previously created item. It will disappear from the
         scene.
         
-        @param label
+        @param item_label
         A string containing the unique label of the previously create item.
         """
-        if label in self.items:
-            item = self.items[label]
+        if item_label in self._programs[program_label]["items"]:
+            item = self._programs[program_label]["items"][item_label]
             item.remove()
-            del self.items[label]
+            del self._programs[program_label]["items"][item_label]
         
 
     def paintGL(self):
@@ -334,6 +333,7 @@ class PainterWidget(QGLWidget):
             prog_id = obj["id"]
             loc_mat_v = obj["loc_mat_v"]
             loc_mat_p = obj["loc_mat_p"]
+            items = obj["items"]
             
             glUseProgram(prog_id)
             
@@ -389,17 +389,16 @@ class PainterWidget(QGLWidget):
             
             
             # Draw items belonging to this program
-            for key, item in self.items.items():
-                if item.program_id == prog_id:
-                    # a draw call usually consists of
-                    #   1. upload Model matrix to GPU
-                    #   2. call glBindVertexArray()
-                    #   3. call glBindBuffer()
-                    #   4. call glDraw...()
-                    
-                    # "billboard" items need camera coordinates which are stored
-                    # in the inverted View matrix
-                    item.draw(self.mat_v_inverted)
+            for key, item in items.items():
+                # a draw call usually consists of
+                #   1. upload Model matrix to GPU
+                #   2. call glBindVertexArray()
+                #   3. call glBindBuffer()
+                #   4. call glDraw...()
+                
+                # "billboard" items need camera coordinates which are stored
+                # in the inverted View matrix
+                item.draw(self.mat_v_inverted)
       
         # nothing more to do here!
         # Swapping the OpenGL buffer is done automatically by Qt. See Qt documentation.

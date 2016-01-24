@@ -96,8 +96,8 @@ class Item():
         self.vao = glGenVertexArrays(1)
         
         # generate data buffer labels aka VBO
-        self.vbo_pos_col = glGenBuffers(1) # this buffer labels positions+colors
-        self.vbo_indices = glGenBuffers(1) # VertexBuffer ID for indices
+        self.vbo_array = glGenBuffers(1) # this buffer labels positions+colors
+        self.vbo_element_array = glGenBuffers(1) # VertexBuffer ID for indices
         
         self.program_id = prog_id # the program/shader to use
         self.label = label
@@ -152,7 +152,7 @@ class Item():
         
         glBindVertexArray(self.vao)
         
-        glBindBuffer(GL_ARRAY_BUFFER, self.vbo_pos_col)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo_array)
 
         glEnableVertexAttribArray(self._loc_pos)
         glVertexAttribPointer(self._loc_pos, 3, GL_FLOAT, GL_FALSE, stride, offset_pos)
@@ -162,7 +162,7 @@ class Item():
         
         if self.vdata_indices != None:
             # indexed drawig is optional
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_indices)
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_element_array)
         
         glBindVertexArray(0)
         
@@ -227,7 +227,7 @@ class Item():
         position_size = self.vdata_pos_col.dtype["position"].itemsize
         color_size = self.vdata_pos_col.dtype["color"].itemsize
         
-        glBindBuffer(GL_ARRAY_BUFFER, self.vbo_pos_col)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo_array)
         
         # replace position
         position = np.array([pos[0], pos[1], pos[2]], dtype=np.float32)
@@ -244,9 +244,9 @@ class Item():
         """
         Removes self. The object will disappear from the world.
         """
-        glDeleteBuffers(1, [self.vbo_pos_col])
+        glDeleteBuffers(1, [self.vbo_array])
         if self.vdata_indices != None:
-            glDeleteBuffers(1, [self.vbo_indices])
+            glDeleteBuffers(1, [self.vbo_element_array])
             
         glDeleteVertexArrays(1, [self.vao])
         self.dirty = True
@@ -313,16 +313,15 @@ class Item():
         
         # upload Model matrix, accessible in the shader as variable mat_m
         mat_m = self.qt_mat_to_list(mat_m)
-        
         glUniformMatrix4fv(self._loc_mat_m, 1, GL_TRUE, mat_m)
         
-        
-        # At this point, the actual drawing is simple!
+        # set up state
         glBindVertexArray(self.vao)
         
         glLineWidth(self.linewidth)
         
         if self.vdata_indices != None:
+            # indexed drawing
             glDrawElements(self.primitive_type, self.vdata_indices.size, GL_UNSIGNED_INT, ctypes.c_void_p(0))
         else:
             glDrawArrays(self.primitive_type, 0, self.vertexcount)

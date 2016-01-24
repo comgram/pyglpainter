@@ -62,7 +62,6 @@ class HeightMap(Item):
         self.nodes_y = nodes_y
         
         self.vdata_indices = self.calculate_indices()
-        print("XXX", self.vdata_indices, self.vdata_indices.size)
         
         super(HeightMap, self).__init__(label, prog, GL_TRIANGLE_STRIP, linewidth, origin, scale, fill)
 
