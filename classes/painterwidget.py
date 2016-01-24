@@ -252,7 +252,13 @@ class PainterWidget(QGLWidget):
         glDetachShader(prog_id, fragment_id)
         
         # remember the program id for later
-        self._programs[label] = prog_id
+        
+        self._programs[label] = {
+            "id": prog_id,
+            "loc_mat_v": glGetUniformLocation(prog_id, "mat_v"),
+            "loc_mat_p": glGetUniformLocation(prog_id, "mat_p"),
+            }
+        
         
         
     def item_create(self, class_name, label, program_name, *args):
@@ -275,9 +281,9 @@ class PainterWidget(QGLWidget):
         """
         if not label in self.items:
             # create
-            prog = self._programs[program_name]
+            prog_id = self._programs[program_name]["id"]
             klss = self.str_to_class(class_name)
-            item = klss(label, prog, *args)
+            item = klss(label, prog_id, *args)
             self.items[label] = item
         else:
             item = self.items[label]
@@ -324,7 +330,11 @@ class PainterWidget(QGLWidget):
         # loop over all programs/shaders
         # first switch to that program (expensive operation)
         # then draw all items belonging to that program
-        for key, prog_id in self._programs.items():
+        for key, obj in self._programs.items():
+            prog_id = obj["id"]
+            loc_mat_v = obj["loc_mat_v"]
+            loc_mat_p = obj["loc_mat_p"]
+            
             glUseProgram(prog_id)
             
             # ======= VIEW MATRIX BEGIN ==========
@@ -361,7 +371,6 @@ class PainterWidget(QGLWidget):
             # upload the View matrix into the GPU,
             # accessible to the vertex shader under the variable name "mat_v"
             mat_v_list = PainterWidget.qt_mat_to_list(self.mat_v) # Transform Qt object to Python list
-            loc_mat_v = glGetUniformLocation(prog_id, "mat_v")
             glUniformMatrix4fv(loc_mat_v, 1, GL_TRUE, mat_v_list)
             # ======= VIEW MATRIX END ==========
             
@@ -375,7 +384,6 @@ class PainterWidget(QGLWidget):
             # upload the Projection matrix into the GPU,
             # accessible to the vertex shader under the variable name "mat_p"
             mat_p_list = PainterWidget.qt_mat_to_list(self.mat_p) #Transform Qt object to Python list
-            loc_mat_p = glGetUniformLocation(prog_id, "mat_p")
             glUniformMatrix4fv(loc_mat_p, 1, GL_TRUE, mat_p_list)
             # ======= PROJECTION MATRIX END ==========
             
@@ -394,7 +402,7 @@ class PainterWidget(QGLWidget):
                     item.draw(self.mat_v_inverted)
       
         # nothing more to do here!
-        # Swapping the OpenGL buffer is done automatically by Qt.
+        # Swapping the OpenGL buffer is done automatically by Qt. See Qt documentation.
 
 
     def resizeGL(self, width, height):

@@ -147,22 +147,21 @@ class Item():
     
     def setup_vao(self):
         stride = self.vdata_pos_col.strides[0]
+        offset_pos = ctypes.c_void_p(0)
+        offset_col = ctypes.c_void_p(self.vdata_pos_col.dtype["position"].itemsize)
         
         glBindVertexArray(self.vao)
         
         glBindBuffer(GL_ARRAY_BUFFER, self.vbo_pos_col)
-        
-        offset_pos = ctypes.c_void_p(0)
-        
-        glEnableVertexAttribArray(self._loc_pos)
-        glVertexAttribPointer(self._loc_pos, 3, GL_FLOAT, False, stride, offset_pos)
 
-        offset_col = ctypes.c_void_p(self.vdata_pos_col.dtype["position"].itemsize)
+        glEnableVertexAttribArray(self._loc_pos)
+        glVertexAttribPointer(self._loc_pos, 3, GL_FLOAT, GL_FALSE, stride, offset_pos)
         
         glEnableVertexAttribArray(self._loc_col)
-        glVertexAttribPointer(self._loc_col, 4, GL_FLOAT, False, stride, offset_col)
+        glVertexAttribPointer(self._loc_col, 4, GL_FLOAT, GL_FALSE, stride, offset_col)
         
         if self.vdata_indices != None:
+            # indexed drawig is optional
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_indices)
         
         glBindVertexArray(0)
