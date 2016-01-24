@@ -229,12 +229,22 @@ class PainterWidget(QGLWidget):
         glCompileShader(vertex_id)
         glCompileShader(fragment_id)
         
+        compile_result = glGetShaderiv(vertex_id, GL_COMPILE_STATUS);
+        if (compile_result == 0):
+            raise RuntimeError("Error in Vertex Shader: " + str(glGetShaderInfoLog(vertex_id)))
+        
+        compile_result = glGetShaderiv(fragment_id, GL_COMPILE_STATUS);
+        if (compile_result == 0):
+            raise RuntimeError("Error in Fragment Shader: " + str(glGetShaderInfoLog(fragment_id)))
+        
         # associate the shaders with the program
         glAttachShader(prog_id, vertex_id)
         glAttachShader(prog_id, fragment_id)
         
         # link the program
         glLinkProgram(prog_id)
+        
+        # TODO: use glGetProgramiv to detect linker errors
         
         # once compiled and linked, the shaders are in the firmware
         # and can be discarded from the application context

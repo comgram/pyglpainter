@@ -61,80 +61,51 @@ class HeightMap(Item):
         self.nodes_x = nodes_x
         self.nodes_y = nodes_y
         
-        self.vbo_indices = glGenBuffers(1) # VertexBuffer ID for indices
-        
         self.vdata_indices = self.calculate_indices()
+        print("XXX", self.vdata_indices, self.vdata_indices.size)
         
         super(HeightMap, self).__init__(label, prog, GL_TRIANGLE_STRIP, linewidth, origin, scale, fill)
 
         self.vdata_pos_col = pos_col
         self.vertexcount = pos_col.size
-
-
-    def setup_vao(self):
-        print("setup_vao", self.vbo_indices, self.vdata_indices)
-        super(HeightMap, self).setup_vao()
-        glBindVertexArray(self.vao)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_indices)
-        #glEnable(GL_PRIMITIVE_RESTART);
-        #glPrimitiveRestartIndex(self.nodes_x * self.nodes_y)
-        glBindVertexArray(0)
-        
-        
-    def upload(self):
-        super(HeightMap, self).upload()
-        print("upload", self.vbo_indices, self.vdata_indices, self.vdata_indices.nbytes)
-        glBindVertexArray(self.vao)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.vdata_indices.nbytes, self.vdata_indices, GL_STATIC_DRAW)
-        glBindVertexArray(0)
-        
-        
-    def draw(self, viewmatrix_inverted=None):
-        # Calculate the Model matrix
-        mat_m = self.calculate_model_matrix(viewmatrix_inverted)
-
-        if self.filled:
-            glPolygonMode( GL_FRONT_AND_BACK, GL_FILL )
-        else:
-            glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
-        
-        # this determines which shaders will be used
-        glUseProgram(self.program_id)
-        
-        # upload Model matrix, accessible in the shader as variable mat_m
-        mat_m = self.qt_mat_to_list(mat_m)
-        loc_mat_m = glGetUniformLocation(self.program_id, "mat_m")
-        glUniformMatrix4fv(loc_mat_m, 1, GL_TRUE, mat_m)
-        
-        
-        # At this point, the actual drawing is simple!
-        glLineWidth(self.linewidth)
-        
-        glBindVertexArray(self.vao)
-
-        glDrawElements(GL_TRIANGLE_STRIP, self.vdata_indices.size, GL_UNSIGNED_INT, ctypes.c_void_p(0))
-        
-        glBindVertexArray(0)
-        
-        self.dirty = False
         
 
     def calculate_indices(self):
         nx = self.nodes_x
         ny = self.nodes_y
         
-        size = 2 * nx * (ny-1) + ny - 2
+        size = 1 + 2 * (nx - 1) * (ny - 1) + 2 * (ny - 1)
         vdata_indices = np.zeros(size, dtype=OpenGL.constants.GLuint)
+
+        j = 1 # start with one, first index always zero
+        d = 1 # right direction
         
-        j = 0
         for y in range(0, ny - 1):
-            for x in range(0, nx):
-                vdata_indices[j] = y * nx + x
-                j += 1
+            
+            if d == 1:
+                r = range(0, nx - 1)
+            else:
+                r = range(nx - 1, 0, -1)
+
+            for x in r:
                 vdata_indices[j] = (y + 1) * nx + x
                 j += 1
-            if y < (ny - 2):
-                vdata_indices[j] = nx * ny
+                vdata_indices[j] = y * nx + x + d
                 j += 1
+            
+            if d == 1:
+                # make a degenerate triangle to finish this row
+                vdata_indices[j] = (y + 2) * nx - 1
+                j += 1
+                vdata_indices[j] = (y + 2) * nx - 1
+                j += 1
+            else:
+                # make a degenerate triangle to finish this row
+                vdata_indices[j] = (y + 1) * nx
+                j += 1
+                vdata_indices[j] = (y + 1) * nx
+                j += 1
+
+            d *= -1
                 
         return vdata_indices

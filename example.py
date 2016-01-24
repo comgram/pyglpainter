@@ -25,6 +25,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 import os
 import random
 import sys
+import math
+
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QVector3D
 
@@ -46,6 +48,7 @@ def main():
     path = os.path.dirname(os.path.realpath(__file__)) + "/shaders/"
     p.program_create("simple3d", path + "simple3d-vertex.c", path + "simple3d-fragment.c")
     p.program_create("simple2d", path + "simple2d-vertex.c", path + "simple2d-fragment.c")
+    p.program_create("heightmap", path + "heightmap-vertex.c", path + "heightmap-fragment.c")
     # ============= CREATE PROGRAMS END =============
     
 
@@ -232,31 +235,21 @@ def main():
     
     
     grid_x = 30
-    grid_y = 20
+    grid_y = 40
     
     dat = np.zeros(grid_x * grid_y, [("position", np.float32, 3), ("color", np.float32, 4)])
     
     for y in range(0, grid_y):
         for x in range(0, grid_x):
             idx = y * grid_x + x
-            dat["position"][idx] = (x, y, 0)
-            print("XXX", idx, (x, y, 0))
+            i = grid_x/2 - x
+            j = grid_y/2 - y
+            z = 10 * math.sin(math.sqrt(i**2 + j**2)) / (math.sqrt(i**2 + j**2) + 0.1)
+            dat["position"][idx] = (x, y, z)
             dat["color"][idx] = (1, 1, 1, 1)
-          
-    print(dat)
-    
-    #dat["position"][0] = [0,0,1]
-    #dat["position"][1] = [100,0,1]
-    #dat["position"][2] = [0,100,20]
-    #dat["position"][3] = [100,100,1]
-    #dat["color"][0] = [1, 0, 0, 1]
-    #dat["color"][1] = [0, 1, 0, 1]
-    #dat["color"][2] = [0, 0, 1, 0]
-    #dat["color"][3] = [0, 0, 1, 1]
-    #print(dat)
+
     i = p.item_create("HeightMap", "myheightmap", "simple3d", grid_x, grid_y, dat, False, (100,400,1), 10)
     i.upload()
-    #i.substitute(2, (0,100,100), (1, 1, 1, 1))
     # ============= CREATE RAW OPENGL PRIMITIVES END =============
     
     

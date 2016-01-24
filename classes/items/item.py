@@ -97,6 +97,7 @@ class Item():
         
         # generate data buffer labels aka VBO
         self.vbo_pos_col = glGenBuffers(1) # this buffer labels positions+colors
+        self.vbo_indices = glGenBuffers(1) # VertexBuffer ID for indices
         
         self.program_id = prog_id # the program/shader to use
         self.label = label
@@ -126,6 +127,11 @@ class Item():
 
         # positions and color
         self.vdata_pos_col = np.zeros(self.vertexcount_max, [("position", np.float32, 3), ("color", np.float32, 4)])
+
+        if not "vdata_indices" in list(vars(self).keys()):
+            self.vdata_indices = None
+        
+        self._loc_mat_m = glGetUniformLocation(self.program_id, "mat_m")
         
         self.setup_vao()
         
@@ -153,6 +159,9 @@ class Item():
         loc_col = glGetAttribLocation(self.program_id, "color")
         glEnableVertexAttribArray(loc_col)
         glVertexAttribPointer(loc_col, 4, GL_FLOAT, False, stride, offset_col)
+        
+        if self.vdata_indices != None:
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_indices)
         
         glBindVertexArray(0)
         
@@ -235,6 +244,9 @@ class Item():
         Removes self. The object will disappear from the world.
         """
         glDeleteBuffers(1, [self.vbo_pos_col])
+        if self.vdata_indices != None:
+            glDeleteBuffers(1, [self.vbo_indices])
+            
         glDeleteVertexArrays(1, [self.vao])
         self.dirty = True
         print("Item {}: removing myself.".format(self.label))
@@ -252,6 +264,9 @@ class Item():
         glBindVertexArray(self.vao)
         
         glBufferData(GL_ARRAY_BUFFER, self.vdata_pos_col.nbytes, self.vdata_pos_col, GL_DYNAMIC_DRAW)
+        
+        if self.vdata_indices != None:
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.vdata_indices.nbytes, self.vdata_indices, GL_STATIC_DRAW)
         
         glBindVertexArray(0)
         
@@ -299,14 +314,20 @@ class Item():
         
         # upload Model matrix, accessible in the shader as variable mat_m
         mat_m = self.qt_mat_to_list(mat_m)
-        loc_mat_m = glGetUniformLocation(self.program_id, "mat_m")
-        glUniformMatrix4fv(loc_mat_m, 1, GL_TRUE, mat_m)
+        
+        glUniformMatrix4fv(self._loc_mat_m, 1, GL_TRUE, mat_m)
         
         
         # At this point, the actual drawing is simple!
         glBindVertexArray(self.vao)
+        
         glLineWidth(self.linewidth)
-        glDrawArrays(self.primitive_type, 0, self.vertexcount)
+        
+        if self.vdata_indices != None:
+            glDrawElements(self.primitive_type, self.vdata_indices.size, GL_UNSIGNED_INT, ctypes.c_void_p(0))
+        else:
+            glDrawArrays(self.primitive_type, 0, self.vertexcount)
+        
         glBindVertexArray(0)
         
         self.dirty = False
