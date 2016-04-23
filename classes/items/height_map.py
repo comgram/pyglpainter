@@ -65,6 +65,10 @@ class HeightMap(Item):
         
         super(HeightMap, self).__init__(label, prog, GL_TRIANGLE_STRIP, linewidth, origin, scale, fill)
         
+        self.set_data(pos_col)
+        
+        
+    def set_data(self, pos_col):
         height_max_idx = pos_col["position"].argmax(axis=0)[2]
         height_min_idx = pos_col["position"].argmin(axis=0)[2]
         height_max = pos_col["position"][height_max_idx][2]
@@ -76,6 +80,7 @@ class HeightMap(Item):
 
         self.vdata_pos_col = pos_col
         self.vertexcount = pos_col.size
+        
         
     def draw(self, mat_v_inverted):
         super(HeightMap, self).draw(mat_v_inverted)

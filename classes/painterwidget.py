@@ -200,7 +200,9 @@ class PainterWidget(QGLWidget):
         A string containing the absolute filepath of the GLSL fragment shader
         source code.
         """
-        self.programs[label] = Program(label, vertex_filepath, fragment_filepath, shader_opts)
+        prog = Program(label, vertex_filepath, fragment_filepath, shader_opts)
+        self.programs[label] = prog
+        return prog
         
         
     def item_create(self, class_name, item_label, program_label, *args):
@@ -234,10 +236,11 @@ class PainterWidget(QGLWidget):
         @param item_label
         A string containing the unique label of the previously create item.
         """
-        if item_label in self.programs[program_label].items:
-            item = self.programs[program_label].items[item_label]
-            item.remove()
-            del self.programs[program_label].items[item_label]
+        for program_label in self.programs.keys():
+            if item_label in self.programs[program_label].items:
+                item = self.programs[program_label].items[item_label]
+                item.remove()
+                del self.programs[program_label].items[item_label]
         
 
     def paintGL(self):

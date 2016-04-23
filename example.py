@@ -272,6 +272,9 @@ def main():
     i.append_vertices([[(-0.8,-0.7,0), (1, 1, 1, 0.5)]])
     i.upload()
     
+    
+    
+    # Draw a "mexican hat" function
     grid_x = 30
     grid_y = 10
     
