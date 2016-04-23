@@ -60,7 +60,7 @@ class Item():
     in this directory which inherit from it).
     """
     
-    def __init__(self, label, prog_id, primitive_type=GL_LINES, linewidth=1, origin=(0,0,0), scale=1, filled=False, vertexcount_max=0):
+    def __init__(self, label, program, primitive_type=GL_LINES, linewidth=1, origin=(0,0,0), scale=1, filled=False, vertexcount_max=0):
         """
         @param label
         A string containing a unique name for this item.
@@ -99,7 +99,7 @@ class Item():
         self.vbo_array = glGenBuffers(1) # this buffer labels positions+colors
         self.vbo_element_array = glGenBuffers(1) # VertexBuffer ID for indices
         
-        self.program_id = prog_id # the program/shader to use
+        self.program = program
         self.label = label
 
         self.vertexcount_max = vertexcount_max # maximum number of vertices
@@ -124,18 +124,19 @@ class Item():
         self.rotation_vector = QVector3D(0, 1, 0) # default rotation around Y
         
         self.dirty = True
+        
+        self.uniforms = {}
 
-        # positions and color
-        self.vdata_pos_col = np.zeros(self.vertexcount_max, [("position", np.float32, 3), ("color", np.float32, 4)])
+        # TODO: Support not only for attributes "color" and "position", but arbitrary
+        # formats.
+        supported_vertex_format = [
+            ("position", np.float32, 3),
+            ("color", np.float32, 4)
+            ]
+        self.vdata_pos_col = np.zeros(self.vertexcount_max, supported_vertex_format)
 
         if not "vdata_indices" in list(vars(self).keys()):
             self.vdata_indices = None
-        
-        self._loc_mat_m = glGetUniformLocation(self.program_id, "mat_m")
-        self._loc_pos = glGetAttribLocation(self.program_id, "position")
-        self._loc_col = glGetAttribLocation(self.program_id, "color")
-        
-        self.setup_vao()
         
         
     def __del__(self):
@@ -145,23 +146,28 @@ class Item():
         pass
     
     
-    def setup_vao(self):
+    def setup_vao(self, locations):
         stride = self.vdata_pos_col.strides[0]
-        offset_pos = ctypes.c_void_p(0)
-        offset_col = ctypes.c_void_p(self.vdata_pos_col.dtype["position"].itemsize)
-        
-        glBindVertexArray(self.vao)
-        
-        glBindBuffer(GL_ARRAY_BUFFER, self.vbo_array)
 
-        glEnableVertexAttribArray(self._loc_pos)
-        glVertexAttribPointer(self._loc_pos, 3, GL_FLOAT, GL_FALSE, stride, offset_pos)
+        glBindVertexArray(self.vao)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo_array) # not part of the VAO state
+
+        # TODO: Support not only for attributes "color" and "position", but arbitrary
+        # formats.
+        offset_pos = ctypes.c_void_p(0)
+        loc_pos = locations["attributes"]["position"]
+        glEnableVertexAttribArray(loc_pos)
+        glVertexAttribPointer(loc_pos, 3, GL_FLOAT, GL_FALSE, stride, offset_pos)
         
-        glEnableVertexAttribArray(self._loc_col)
-        glVertexAttribPointer(self._loc_col, 4, GL_FLOAT, GL_FALSE, stride, offset_col)
+        if "color" in locations["attributes"]:
+            offset_col = ctypes.c_void_p(self.vdata_pos_col.dtype["position"].itemsize)
+            loc_col = locations["attributes"]["color"]
+            glEnableVertexAttribArray(loc_col)
+            glVertexAttribPointer(loc_col, 4, GL_FLOAT, GL_FALSE, stride, offset_col)
+        
         
         if self.vdata_indices != None:
-            # indexed drawig is optional
+            # indexed drawing is optional and per-item
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.vbo_element_array)
         
         glBindVertexArray(0)
@@ -264,10 +270,11 @@ class Item():
         """
         glBindVertexArray(self.vao)
         
-        glBufferData(GL_ARRAY_BUFFER, self.vdata_pos_col.nbytes, self.vdata_pos_col, GL_DYNAMIC_DRAW)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo_array) # this is not part of the VAO state
+        glBufferData(GL_ARRAY_BUFFER, self.vdata_pos_col.nbytes, self.vdata_pos_col, GL_DYNAMIC_DRAW) # TODO: make STATIC/DYNAMIC configurable
         
         if self.vdata_indices != None:
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.vdata_indices.nbytes, self.vdata_indices, GL_STATIC_DRAW)
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.vdata_indices.nbytes, self.vdata_indices, GL_STATIC_DRAW) # indexes never change and are static
         
         glBindVertexArray(0)
         
@@ -292,8 +299,9 @@ class Item():
         self.origin = QVector3D(*tpl)
         self.origin_tuple = tpl
 
+
         
-    def draw(self, viewmatrix_inverted=None):
+    def draw(self, mat_v_inverted):
         """
         Draws this object. Call this from within `paintGL()`.
         Assumes that glUseProgram() has been called.
@@ -303,23 +311,26 @@ class Item():
         Mandatory only when self.billboard == True
         """
         
-        # Calculate the Model matrix
-        mat_m = self.calculate_model_matrix(viewmatrix_inverted)
+        mat_m = self.calculate_model_matrix(mat_v_inverted)
+        mat_m = Item.qt_mat_to_list(mat_m)
+        self.program.set_uniform("mat_m", mat_m)
+        
+        for key, val in self.uniforms.items():
+            if not key in self.program.locations["uniforms"]:
+                raise SystemError("Shader does not know about uniform {}".format(key))
+            self.program.set_uniform(key, val)
 
         if self.filled:
             glPolygonMode( GL_FRONT_AND_BACK, GL_FILL )
         else:
             glPolygonMode( GL_FRONT_AND_BACK, GL_LINE )
         
-        # upload Model matrix, accessible in the shader as variable mat_m
-        mat_m = self.qt_mat_to_list(mat_m)
-        glUniformMatrix4fv(self._loc_mat_m, 1, GL_TRUE, mat_m)
-        
         # set up state
         glBindVertexArray(self.vao)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo_array) # this is not part of the VAO state
         
+        # draw!
         glLineWidth(self.linewidth)
-        
         if self.vdata_indices != None:
             # indexed drawing
             glDrawElements(self.primitive_type, self.vdata_indices.size, GL_UNSIGNED_INT, ctypes.c_void_p(0))

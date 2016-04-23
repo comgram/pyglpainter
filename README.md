@@ -2,6 +2,8 @@
 
 Minimalistic but modern OpenGL drawing for technical applications
 
+![](http://michaelfranzl.com/wp-content/uploads/2016/04/Selection_309-1024x576.png)
+
 This module includes the class PainterWidget, extending
 PyQt5's QGLWidget with boilerplate code neccessary
 for applications which want to build a classical orthagnoal 3D world

@@ -84,5 +84,3 @@ class OrthoLineGrid(Item):
             y = unit * hu
             self.append_vertices([[(0, y, 0), color]])
             self.append_vertices([[(width, y, 0), color]])
-
-        self.upload()

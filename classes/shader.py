@@ -54,3 +54,4 @@ class Shader():
         compile_result = glGetShaderiv(self.id, GL_COMPILE_STATUS);
         if (compile_result == 0):
             raise RuntimeError("Error in Shader: " + str(glGetShaderInfoLog(self.id)))
+        print("SHADER COMPILE", filepath, compile_result)

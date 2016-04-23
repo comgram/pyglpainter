@@ -123,7 +123,7 @@ class GcodePath(Item):
         pass
         
         
-    def draw(self, viewmatrix=None):
+    def draw(self, mat_v_inverted):
         for line_number in self._lines_to_highlight:
             if 2 * line_number > self.vertexcount: continue
         
@@ -142,7 +142,7 @@ class GcodePath(Item):
             
         del self._lines_to_highlight[:]
 
-        super(GcodePath, self).draw(viewmatrix)
+        super(GcodePath, self).draw(mat_v_inverted)
         
         
     def render(self):

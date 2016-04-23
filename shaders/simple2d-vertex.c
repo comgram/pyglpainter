@@ -1,8 +1,6 @@
 #version 120
 
 uniform mat4 mat_m;
-uniform mat4 mat_v;
-uniform mat4 mat_p;
 
 attribute vec4 color;
 attribute vec3 position;

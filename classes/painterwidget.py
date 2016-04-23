@@ -183,7 +183,7 @@ class PainterWidget(QGLWidget):
         self._timer.start(10)
 
 
-    def program_create(self, label, vertex_filepath, fragment_filepath):
+    def program_create(self, label, vertex_filepath, fragment_filepath, shader_opts):
         """
         Create a named OpenGL program.
         
@@ -200,7 +200,7 @@ class PainterWidget(QGLWidget):
         A string containing the absolute filepath of the GLSL fragment shader
         source code.
         """
-        self.programs[label] = Program(label, vertex_filepath, fragment_filepath)
+        self.programs[label] = Program(label, vertex_filepath, fragment_filepath, shader_opts)
         
         
     def item_create(self, class_name, item_label, program_label, *args):
@@ -260,66 +260,61 @@ class PainterWidget(QGLWidget):
            a. Binding the data buffers of the object
            b. Drawing of the object
         """
-        #print("paintGL called")
+        print("paintGL called")
         
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        
+        # ======= VIEW MATRIX BEGIN ==========
+        # start with an empty matrix
+        self.mat_v = QMatrix4x4()
+        
+        # rotate the world
+        self.mat_v.rotate(self._rotation_quat) # math is done by Qt!
+        
+        # translate the world
+        self.mat_v.translate(self._translation_vec) # math is done by Qt!
+        
+        # calculate inverse view matrix which contains
+        # camera right, up, look directions, and camera position
+        # Items in "billboard" mode will need this to know where the camera is
+        self.mat_v_inverted = self.mat_v.inverted()[0]
+        
+        # the right direction of the camera
+        cam_right = self.mat_v_inverted * QVector4D(1,0,0,0) # extract 1st column
+        self.cam_right = QVector3D(cam_right[0], cam_right[1], cam_right[2])
+        
+        # the up direction of the camera
+        cam_up = self.mat_v_inverted * QVector4D(0,1,0,0) # extract 2nd column
+        self.cam_up = QVector3D(cam_up[0], cam_up[1], cam_up[2])
+        
+        # the look direction of the camera
+        cam_look = self.mat_v_inverted * QVector4D(0,0,1,0) # extract 3rd column
+        self.cam_look = QVector3D(cam_look[0], cam_look[1], cam_look[2])
+        
+        # the postion of the camera
+        cam_pos = self.mat_v_inverted * QVector4D(0,0,0,1) # extract 4th column
+        self.cam_pos = QVector3D(cam_pos[0], cam_pos[1], cam_pos[2])
+        
+        # upload the View matrix into the GPU,
+        # accessible to the vertex shader under the variable name "mat_v"
+        mat_v_list = PainterWidget.qt_mat_to_list(self.mat_v) # Transform Qt object to Python list
+        # ======= VIEW MATRIX END ==========
+        
+        # ======= PROJECTION MATRIX BEGIN ==========
+        self.mat_p = QMatrix4x4() # start with an empty matrix
+        self.mat_p.perspective(self.fov, self.aspect, 0.1, 100000) # math is done by Qt!
+        mat_p_list = PainterWidget.qt_mat_to_list(self.mat_p) #Transform Qt object to Python list
+        # ======= PROJECTION MATRIX END ==========
         
         # loop over all programs/shaders
         # first switch to that program (expensive operation)
         # then draw all items belonging to that program
         for key, prog in self.programs.items():
-            glUseProgram(prog.id)
-            
-            # ======= VIEW MATRIX BEGIN ==========
-            # start with an empty matrix
-            self.mat_v = QMatrix4x4()
-            
-            # rotate the world
-            self.mat_v.rotate(self._rotation_quat) # math is done by Qt!
-            
-            # translate the world
-            self.mat_v.translate(self._translation_vec) # math is done by Qt!
-            
-            # calculate inverse view matrix which contains
-            # camera right, up, look directions, and camera position
-            # Items in "billboard" mode will need this to know where the camera is
-            self.mat_v_inverted = self.mat_v.inverted()[0]
-            
-            # the right direction of the camera
-            cam_right = self.mat_v_inverted * QVector4D(1,0,0,0) # extract 1st column
-            self.cam_right = QVector3D(cam_right[0], cam_right[1], cam_right[2])
-            
-            # the up direction of the camera
-            cam_up = self.mat_v_inverted * QVector4D(0,1,0,0) # extract 2nd column
-            self.cam_up = QVector3D(cam_up[0], cam_up[1], cam_up[2])
-            
-            # the look direction of the camera
-            cam_look = self.mat_v_inverted * QVector4D(0,0,1,0) # extract 3rd column
-            self.cam_look = QVector3D(cam_look[0], cam_look[1], cam_look[2])
-            
-            # the postion of the camera
-            cam_pos = self.mat_v_inverted * QVector4D(0,0,0,1) # extract 4th column
-            self.cam_pos = QVector3D(cam_pos[0], cam_pos[1], cam_pos[2])
-            
-            # upload the View matrix into the GPU,
-            # accessible to the vertex shader under the variable name "mat_v"
-            mat_v_list = PainterWidget.qt_mat_to_list(self.mat_v) # Transform Qt object to Python list
-            glUniformMatrix4fv(prog.loc_mat_v, 1, GL_TRUE, mat_v_list)
-            # ======= VIEW MATRIX END ==========
-            
-            
-            # ======= PROJECTION MATRIX BEGIN ==========
-            self.mat_p = QMatrix4x4() # start with an empty matrix
-            self.mat_p.perspective(self.fov, self.aspect, 0.1, 100000) # math is done by Qt!
-            # ======= PROJECTION MATRIX END ==========
-            
-            # upload the Projection matrix into the GPU,
-            # accessible to the vertex shader under the variable name "mat_p"
-            mat_p_list = PainterWidget.qt_mat_to_list(self.mat_p) #Transform Qt object to Python list
-            glUniformMatrix4fv(prog.loc_mat_p, 1, GL_TRUE, mat_p_list)
-            # ======= PROJECTION MATRIX END ==========
-            
-            prog.items_draw(self.mat_v_inverted)
+            if len(list(prog.items.keys())) > 0:
+                glUseProgram(prog.id)
+                prog.set_uniform("mat_v", mat_v_list) # set view matrix
+                prog.set_uniform("mat_p", mat_p_list) # set projection matrix
+                prog.items_draw(self.mat_v_inverted)
       
         # nothing more to do here!
         # Swapping the OpenGL buffer is done automatically by Qt. See Qt documentation.

@@ -48,7 +48,7 @@ class Program():
     This class represents an OpenGL program.
     """
     
-    def __init__(self, label, vertex_filepath, fragment_filepath):
+    def __init__(self, label, vertex_filepath, fragment_filepath, shader_opts):
         """
         Create a named OpenGL program, attach shaders to it, and remember.
         
@@ -66,23 +66,42 @@ class Program():
         source code.
         """
         self.id = glCreateProgram()
+        self.label = label
         self.shader_vertex = Shader(GL_VERTEX_SHADER, vertex_filepath)
         self.shader_fragment = Shader(GL_FRAGMENT_SHADER, fragment_filepath)
+        
+        self.shader_opts = shader_opts
         
         glAttachShader(self.id, self.shader_vertex.id)
         glAttachShader(self.id, self.shader_fragment.id)
         
         # link
         glLinkProgram(self.id)
-        # TODO: use glGetProgramiv to detect linker errors
+        link_result = glGetProgramiv(self.id, GL_LINK_STATUS)
+        if (link_result == 0):
+            raise RuntimeError("Error in LINKING")
+        #print("SHADER LINK", link_result)
         
         # once compiled and linked, the shaders are in the firmware
         # and can be discarded from the application context
         glDetachShader(self.id, self.shader_vertex.id)
         glDetachShader(self.id, self.shader_fragment.id)
         
-        self.loc_mat_v = glGetUniformLocation(self.id, "mat_v")
-        self.loc_mat_p = glGetUniformLocation(self.id, "mat_p")
+        self.locations = {
+            "uniforms": {},
+            "attributes": {}
+            }
+        
+        self.uniform_function_dispatcher = {
+            "Matrix4fv": glUniformMatrix4fv,
+            "1f": glUniform1f,
+            }
+        
+        for varname, tpe in shader_opts["uniforms"].items():
+            self.locations["uniforms"][varname] = glGetUniformLocation(self.id, varname)
+            
+        for varname, tpe in shader_opts["attributes"].items():
+            self.locations["attributes"][varname] = glGetAttribLocation(self.id, varname)
         
         self.items = {}
         
@@ -91,23 +110,41 @@ class Program():
         if not item_label in self.items:
             # create
             klss = self.str_to_class(class_name)
-            item = klss(item_label, self.id, *args)
+            item = klss(item_label, self, *args)
             self.items[item_label] = item
+            
+            item.setup_vao(self.locations)
+            item.upload()
         else:
             item = self.items[item_label]
             
         return item
         
+        
+    def set_uniform(self, key, val):
+        if key in self.locations["uniforms"]:
+            function_string = self.shader_opts["uniforms"][key]
+            location = self.locations["uniforms"][key]
+            function = self.uniform_function_dispatcher[function_string]
+            
+            # see https://www.opengl.org/sdk/docs/man/html/glUniform.xhtml
+            if "Matrix" in function_string:
+                count = 1
+                transpose = GL_TRUE
+                function(location, count, transpose, val)
+            elif "v" in function_string:
+                function(location, count, val)
+            else:
+                print("set_uniform", key, val)
+                function(location, *val)
+                
+            
+        else:
+          print("Warning: set_uniform(): Uniform {} is not used in the shader.".format(key))
+
+
     def items_draw(self, mat_v_inverted):
         for label, item in self.items.items():
-            # a draw call usually consists of
-            #   1. upload Model matrix to GPU
-            #   2. call glBindVertexArray()
-            #   3. call glBindBuffer()
-            #   4. call glDraw...()
-            
-            # "billboard" items need camera coordinates which are stored
-            # in the inverted View matrix
             item.draw(mat_v_inverted)
 
 
