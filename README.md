@@ -4,8 +4,8 @@ Minimalistic but modern OpenGL drawing for technical applications
 
 ![](http://michaelfranzl.com/wp-content/uploads/2016/04/Selection_309-1024x576.png)
 
-This module includes the class PainterWidget, extending
-PyQt5's QGLWidget with boilerplate code neccessary
+This Python module provides the class `PainterWidget`, extending
+PyQt5's `QGLWidget` class with boilerplate code neccessary
 for applications which want to build a classical orthagnoal 3D world
 in which the user can interactively navigate with the mouse via the
 classical (and expected) Pan-Zoom-Rotate paradigm implemented via a
@@ -14,8 +14,8 @@ virtual trackball (using quaternions for rotations).
 This class is especially useful for technical visualizations in 3D
 space. It provides a simple Python API to draw raw OpenGL primitives
 (LINES, LINE_STRIP, TRIANGLES, etc.) as well as a number of useful
-composite primitives rendered by this class itself (Grid, Star,
-CoordSystem, Text, etc., see files in classes/items). As a bonus,
+composite primitives rendered by this class itself (`Grid`, `Star`,
+`CoordSystem`, `Text`, etc., see files in classes/items). As a bonus,
 all objects/items can either be drawn as real 3D world entities which
 optionally support "billboard" mode (fully camera-aligned or arbitrary-
 axis aligned), or as a 2D overlay.
@@ -86,14 +86,15 @@ first):
     
 #### Individual steps
 
-You first need to create a PyQt5 window, then add to it a PainterWidget
-instance (for working code see example.py). Let's say this PainterWidget
-instance is the variable `painter`. You then can simply draw a coordinate system:
+You first need to create a PyQt5 window, then add to it one `PainterWidget`
+instance (for working code see `example.py`). Let's say this `PainterWidget`
+instance is stored in the variable `painter`. You then can simply draw a
+coordinate system:
 
     mycs1 = painter.item_create("CoordSystem", "mycs1", "simple3d", 12, (0, 0, 0))
     
-This means: Painter, create an item of class CoordSystem called "mycs1"
-with the program called "simple3d". Scale it by 12 and put its origin to
+This means: Painter, create an item of class `CoordSystem` labeled "mycs1"
+with the shader program called "simple3d". Scale it by 12 and put its origin to
 the world coordinates (0,0,0).
     
 
