@@ -72,7 +72,8 @@ class GcodePath(Item):
         super(GcodePath, self).__init__(label, prog_id, GL_LINE_STRIP, 2)
         
         self.machine = GcodeMachine(cmpos, ccs, cs_offsets)
-        self.machine.do_fractionize_lines = False
+        self.machine.do_fractionize_lines = True
+        self.machine.do_fractionize_arcs = True
         
         self._lines_to_highlight = [] # line segments can be highlighted
         
@@ -91,6 +92,8 @@ class GcodePath(Item):
             lines = self.machine.fractionize()
             self.gcode += lines
             self.machine.done()
+            
+        #print("ALL", gcode_list)
         
         # reset, we re-run in render()
         self.machine.position_m = cmpos
@@ -151,6 +154,7 @@ class GcodePath(Item):
         """
         
         colors = {
+            None: (.5, .5, .5, 1),  # grey
             0: (.5, .5, .5, 1),  # grey
             1: (.7, .7, 1, 1),   # blue/purple
             2: (1, 0.7, 0.8, 1), # redish
@@ -176,8 +180,11 @@ class GcodePath(Item):
             self.machine.strip()
             self.machine.tidy()
             
-            #print("----", self.machine.line, self.machine.line_is_only_comment)
+            
+            
             self.machine.parse_state()
+            
+            #print("----", self.machine.line, self.machine.position_m, self.machine.current_motion_mode)
             
             
 
