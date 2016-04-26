@@ -61,7 +61,7 @@ class GcodePath(Item):
         4..9 (corresponding to G54-G59). `ccs` must be a key in `cs_offsets`.
         
         @param cs_offsets
-        Coordinate system offsets. A Python dict with integer keys and
+        Coordinate system offsets. A Python dict with
         3-tuples as offsets. Keys must correspond to the range of `ccs`.
         When a G54-G59 change coordinate system command is encountered,
         the position for the next movement command will be relative to the
@@ -189,10 +189,12 @@ class GcodePath(Item):
             # illustrate the intensity of a laser for engraving.
             color1 = col
             ss = self.machine.current_spindle_speed
-            if ss == None or ss == 0:
+            if ss == None:
                 color2 = (col[0], col[1], col[2], 0.3)
             else:
-                color2 = (0.3, 0.2, ss/255, 0.8) # blueish hue
+                color1 = (ss/255, ss/255, 1, 1) # blueish hue
+                color2 = (ss/255, ss/255, 1, 0.3) # blueish hue
+                print("COLOR", self.machine.current_spindle_speed, color2)
                 
             
             # draw two gl line segments per gcode line for better visualization of commands

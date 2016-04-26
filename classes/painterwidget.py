@@ -33,8 +33,8 @@ from PyQt5.QtOpenGL import QGLWidget
 from PyQt5.QtCore import pyqtSignal, QPoint, Qt, QSize, QTimer
 
 import OpenGL
-OpenGL.ERROR_CHECKING = True
-OpenGL.FULL_LOGGING = True
+OpenGL.ERROR_CHECKING = False
+OpenGL.FULL_LOGGING = False
 from OpenGL.GL import *
 
 from .program import Program
