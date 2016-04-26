@@ -38,7 +38,7 @@ class GcodePath(Item):
     modes are drawn with different colors for better visualization.
     """
 
-    def __init__(self, label, prog_id, gcode_list, cwpos, ccs, cs_offsets):
+    def __init__(self, label, prog_id, gcode_list, cmpos, ccs, cs_offsets):
         """
         param label
         A string containing a unique name for this item.
@@ -49,8 +49,8 @@ class GcodePath(Item):
         @param gcode_list
         A Python list of strings of G-codes that will be plotted.
         
-        @param cwpos
-        Current working position. G-Codes imply a state machine knowing
+        @param cmpos
+        Current machine position. G-Codes imply a state machine knowing
         its position. This is the initial position of the state machine.
         A 3-tuple of global coordinates.
         
@@ -71,39 +71,30 @@ class GcodePath(Item):
 
         super(GcodePath, self).__init__(label, prog_id, GL_LINE_STRIP, 2)
         
-        self.ccs = ccs
-        self.cs_offsets = cs_offsets
-        self.position = list(cwpos)
+        self.machine = GcodeMachine(cmpos, ccs, cs_offsets)
+        self.machine.do_fractionize_lines = False
         
         self._lines_to_highlight = [] # line segments can be highlighted
         
-        self.axes = ["X", "Y", "Z"]
-        self._re_axis_values = []
-        for i in range(0, 3):
-            axis = self.axes[i]
-            self._re_axis_values.append(re.compile(".*" + axis + "([-.\d]+)"))
-            
-        self._re_contains_spindle = re.compile(".*S(\d+)")
         self._re_comment_colorvalues_grbl = re.compile(".*_gerbil.color_begin\[(.*?),(.*?),(.*?)\]")
-        self._re_allcomments_remove = re.compile(";.*")
-        self._re_motion_mode = re.compile("G([0123])*([^\\d]|$)")
-        self._re_distance_mode = re.compile("(G9[01])([^\d]|$)")
 
         # Run the G-codes through a preprocessor. It will clean up the
         # G-Code from unsupported things and also break arcs down into
         # line segments since OpenGL has no notion about arcs.
         self.gcode = []
-        self.preprocessor = GcodeMachine()
-        self.preprocessor.position = list(self.position) # initial state
-        self.preprocessor.target = list(self.position)   # initial state
+        
         for line in gcode_list:
-            self.preprocessor.set_line(line)
-            self.preprocessor.strip()
-            self.preprocessor.tidy()
-            self.preprocessor.parse_state()
-            lines = self.preprocessor.fractionize()
+            self.machine.set_line(line)
+            self.machine.strip()
+            self.machine.tidy()
+            self.machine.parse_state()
+            lines = self.machine.fractionize()
             self.gcode += lines
-            self.preprocessor.done()
+            self.machine.done()
+        
+        # reset, we re-run in render()
+        self.machine.position_m = cmpos
+        self.machine.current_cs = ccs
 
         self.set_vertexcount_max(2 * len(self.gcode) + 1)
 
@@ -167,18 +158,14 @@ class GcodePath(Item):
             }
         col = colors[0] # initial color
 
-        # state machine states
-        current_motion_mode = 0
-        distance_mode = "G90"
-        spindle_speed = None
-        diff = [0, 0, 0]
         comment_color = None # if current in color mode (_gerbil.color_begin comments)
         
         # create vertex at start of path
-        end = np.add(self.cs_offsets[self.ccs], self.position)
-        self.append_vertices([[tuple(end), col]])
+        self.append_vertices([[self.machine.position_m, col]])
         
         for line in self.gcode:
+            self.machine.set_line(line)
+            
             # find colors in comments
             if "color_begin" in line:
                 m = re.match(self._re_comment_colorvalues_grbl, line)
@@ -186,59 +173,32 @@ class GcodePath(Item):
             elif "color_end" in line:
                 comment_color = None
             
-            # remove all comments
-            line = re.sub(self._re_allcomments_remove, "", line)
+            self.machine.strip()
+            self.machine.tidy()
             
-            # get current motion mode
-            m = re.match(self._re_motion_mode, line)
-            if m:
-                current_motion_mode = int(m.group(1))
-                if current_motion_mode == 2 or current_motion_mode == 3:
-                    print("GcodePath.render(): Encountered G2 or G3 command. Will draw a straight line from position to target. Use preprocessor to correctly break down arcs.")
-
-            # get spindle speed / laser intensity
-            m = re.match(self._re_contains_spindle, line)
-            if m:
-                spindle_speed = int(m.group(1))
+            #print("----", self.machine.line, self.machine.line_is_only_comment)
+            self.machine.parse_state()
+            
+            
 
             # select color from comment if present, else default color
-            col = comment_color if comment_color else colors[current_motion_mode]
-                
-            # parse distance mode (absolute, relative)
-            m = re.match(self._re_distance_mode, line)
-            if m: distance_mode = m.group(1)
-            
-            # get current coordinate system G54-G59
-            mcs = re.match("G(5[4-9]).*", line)
-            if mcs: 
-                self.ccs = "G" + mcs.group(1)
-
-            # parse X, Y, Z axis target of the line
-            for i in range(0, 3):
-                axis = self.axes[i]
-                cr = self._re_axis_values[i]
-                m = re.match(cr, line)
-                if m:
-                    a = float(m.group(1)) # axis value
-                    if distance_mode == "G90":
-                        # absolute
-                        self.position[i] = a
-                    else:
-                        # relative
-                        self.position[i] += a
-
-            start = end
-            end = np.add(self.cs_offsets[self.ccs], self.position)
-            diff = np.subtract(end, start)
+            col = comment_color if comment_color else colors[self.machine.current_motion_mode]
             
             # each line segment will have a gradient from selected color
             # to either dark, or a color depending on the S value, to better
             # illustrate the intensity of a laser for engraving.
             color1 = col
-            if spindle_speed == None or spindle_speed == 0:
+            ss = self.machine.current_spindle_speed
+            if ss == None or ss == 0:
                 color2 = (col[0], col[1], col[2], 0.3)
             else:
-                color2 = (0.3, 0.2, spindle_speed/255, 0.8) # blueish hue
+                color2 = (0.3, 0.2, ss/255, 0.8) # blueish hue
+                
             
-            self.append_vertices([[start + diff * 0.001, color1]])
-            self.append_vertices([[start + diff, color2]])
+            # draw two gl line segments per gcode line for better visualization of commands
+            target = np.array(self.machine.target_m)
+            diff = np.subtract(self.machine.target_m, self.machine.position_m)
+            self.append_vertices([[self.machine.position_m + diff * 0.001, color1]])
+            self.append_vertices([[self.machine.target_m, color2]])
+            
+            self.machine.done()

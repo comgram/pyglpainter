@@ -176,12 +176,14 @@ def main():
     gcodes.append("G0 X20 Y20")
     gcodes.append("G1 X30")
     gcodes.append("G1 X40")
-    gcodes.append("G1 X50 Y20")
+    gcodes.append("G1 X50")
     gcodes.append("G2 X60 Y30 I5 J5")
-    cs_offsets = {"G54": mycs2.origin_tuple }
-    cs = "G54"
-    mygcode1 = p.item_create("GcodePath", "mygcode1", "simple3d", gcodes, (0,0,0), "G54", cs_offsets)
-    i = p.item_create("Text", "mygcodelabel", "simple3d", "class GcodePath", mycs2.origin_tuple, 1)
+    cs_offsets = {"G54": (10,10,0) }
+    cmpos = (0,0,0) # note this: since no Z movement in Gcode, all is in plane of Z=10
+    mygcode1 = p.item_create("GcodePath", "mygcode1", "simple3d", gcodes, cmpos, "G54", cs_offsets)
+    mygcode1.set_origin(mycs2.origin_tuple)
+    
+    i = p.item_create("Text", "mygcodelabel", "simple3d", "class GcodePath", (0,0,0), 1)
     i.billboard = True
     i.billboard_axis = "Z"
     # ============= CREATE COMPOUND PRIMITIVES END =============
