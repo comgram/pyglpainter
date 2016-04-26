@@ -12,7 +12,7 @@ void main()
   float r, g, b;
 
   // calculate a 7-step color spectrum
-  float a = 6 * (height - height_min) / (height_max - height_min); // normalize
+  float a = 6 * ( height - height_min) / ( height_max - height_min); // normalize
   float x = floor(a);
   float y = a-x;
   

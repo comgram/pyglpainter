@@ -25,7 +25,7 @@ import numpy as np
 import OpenGL
 from OpenGL.GL import *
 
-from ..gcode_preprocessor import GcodePreprocessor
+from gcode_machine.gcode_machine import GcodeMachine
 from .item import Item
 
 class GcodePath(Item):
@@ -93,11 +93,12 @@ class GcodePath(Item):
         # G-Code from unsupported things and also break arcs down into
         # line segments since OpenGL has no notion about arcs.
         self.gcode = []
-        self.preprocessor = GcodePreprocessor()
+        self.preprocessor = GcodeMachine()
         self.preprocessor.position = list(self.position) # initial state
         self.preprocessor.target = list(self.position)   # initial state
         for line in gcode_list:
             self.preprocessor.set_line(line)
+            self.preprocessor.strip()
             self.preprocessor.tidy()
             self.preprocessor.parse_state()
             lines = self.preprocessor.fractionize()
@@ -154,8 +155,8 @@ class GcodePath(Item):
         `_gerbil.color_begin` and `_gerbil.color_end`. If color is not
         set via comments, default colors are taken from the motion mode.
         
-        This method only supports G0 and G1 linear motions. Use a
-        preprocessor to break arcs down into lines.
+        This method only supports G0 and G1 linear motion. Use a
+        Gcode processor to break arcs down into lines.
         """
         
         colors = {
@@ -212,7 +213,7 @@ class GcodePath(Item):
             if mcs: 
                 self.ccs = "G" + mcs.group(1)
 
-            # parse X, Y, Z axis target of thie line
+            # parse X, Y, Z axis target of the line
             for i in range(0, 3):
                 axis = self.axes[i]
                 cr = self._re_axis_values[i]
