@@ -194,7 +194,6 @@ class GcodePath(Item):
             else:
                 color1 = (ss/255, ss/255, 1, 1) # blueish hue
                 color2 = (ss/255, ss/255, 1, 0.3) # blueish hue
-                print("COLOR", self.machine.current_spindle_speed, color2)
                 
             
             # draw two gl line segments per gcode line for better visualization of commands
