@@ -77,7 +77,7 @@ class GcodePath(Item):
         
         self._lines_to_highlight = [] # line segments can be highlighted
         
-        self._re_comment_colorvalues_grbl = re.compile(".*_gerbil.color_begin\[(.*?),(.*?),(.*?)\]")
+        self._re_comment_colorvalues_grbl = re.compile(".*_gcm.color_begin\[(.*?),(.*?),(.*?)\]")
 
         # Run the G-codes through a preprocessor. It will clean up the
         # G-Code from unsupported things and also break arcs down into
@@ -146,7 +146,7 @@ class GcodePath(Item):
         
         This emulates the state machine of a CNC machine. The color
         of drawn paths is taken from a special comment environment
-        `_gerbil.color_begin` and `_gerbil.color_end`. If color is not
+        `_gcm.color_begin` and `_gcm.color_end`. If color is not
         set via comments, default colors are taken from the motion mode.
         
         This method only supports G0 and G1 linear motion. Use a
@@ -162,7 +162,7 @@ class GcodePath(Item):
             }
         col = colors[0] # initial color
 
-        comment_color = None # if current in color mode (_gerbil.color_begin comments)
+        comment_color = None # if current in color mode (_gcm.color_begin comments)
         
         # create vertex at start of path
         self.append_vertices([[self.machine.position_m, col]])
