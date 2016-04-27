@@ -96,8 +96,11 @@ class GcodePath(Item):
         #print("ALL", gcode_list)
         
         # reset, we re-run in render()
+        self.machine.reset()
         self.machine.position_m = cmpos
         self.machine.current_cs = ccs
+        
+        #print("HERE1", self.machine.pos_m, self.machine.pos_w, self.machine.cs_offsets)
 
         self.set_vertexcount_max(2 * len(self.gcode) + 1)
 
@@ -184,7 +187,7 @@ class GcodePath(Item):
             
             self.machine.parse_state()
             
-            #print("----", self.machine.line, self.machine.position_m, self.machine.current_motion_mode)
+            #print("----", self.machine.line, self.machine.current_motion_mode, self.machine.pos_m, self.machine.pos_w)
             
             
 
