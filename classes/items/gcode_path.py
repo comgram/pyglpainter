@@ -72,35 +72,28 @@ class GcodePath(Item):
         super(GcodePath, self).__init__(label, prog_id, GL_LINE_STRIP, 2)
         
         self.machine = GcodeMachine(cmpos, ccs, cs_offsets)
-        self.machine.do_fractionize_lines = True
-        self.machine.do_fractionize_arcs = True
+        
+        self.machine.do_fractionize_arcs = True # OpenGL doesn't have a notion about arcs
+        self.machine.do_fractionize_lines = False
+        
+        self.machine.special_comment_prefix = "_sim"
         
         self._lines_to_highlight = [] # line segments can be highlighted
-        
-        self._re_comment_colorvalues_grbl = re.compile(".*_gcm.color_begin\[(.*?),(.*?),(.*?)\]")
 
-        # Run the G-codes through a preprocessor. It will clean up the
-        # G-Code from unsupported things and also break arcs down into
-        # line segments since OpenGL has no notion about arcs.
         self.gcode = []
         
         for line in gcode_list:
             self.machine.set_line(line)
-            self.machine.strip()
-            self.machine.tidy()
             self.machine.parse_state()
             lines = self.machine.fractionize()
+            
             self.gcode += lines
             self.machine.done()
-            
-        #print("ALL", gcode_list)
         
         # reset, we re-run in render()
         self.machine.reset()
         self.machine.position_m = cmpos
         self.machine.current_cs = ccs
-        
-        #print("HERE1", self.machine.pos_m, self.machine.pos_w, self.machine.cs_offsets)
 
         self.set_vertexcount_max(2 * len(self.gcode) + 1)
 
@@ -157,58 +150,71 @@ class GcodePath(Item):
         """
         
         colors = {
-            None: (.5, .5, .5, 1),  # grey
-            0: (.5, .5, .5, 1),  # grey
-            1: (.7, .7, 1, 1),   # blue/purple
-            2: (1, 0.7, 0.8, 1), # redish
-            3: (1, 0.9, 0.7, 1), # red/yellowish
+            0: (.5, .5, .5),
+            1: (.7, .7, 1),
+            2: (.8, .7, 1),
+            3: (.7, .8, 1),
             }
         col = colors[0] # initial color
-
-        comment_color = None # if current in color mode (_gcm.color_begin comments)
         
         # create vertex at start of path
-        self.append_vertices([[self.machine.position_m, col]])
+        self.append_vertices([[self.machine.position_m, (col[0], col[1], col[2], 1)]])
         
+        arc_mode = False
+        arc_by_sim = False
+        arc_count = 0
         for line in self.gcode:
             self.machine.set_line(line)
-            
-            # find colors in comments
-            if "color_begin" in line:
-                m = re.match(self._re_comment_colorvalues_grbl, line)
-                comment_color = (m.group(1), m.group(2), m.group(3), 1)
-            elif "color_end" in line:
-                comment_color = None
-            
-            self.machine.strip()
-            self.machine.tidy()
-            
-            
-            
             self.machine.parse_state()
-            
-            #print("----", self.machine.line, self.machine.current_motion_mode, self.machine.pos_m, self.machine.pos_w)
-            
+
+            if "arc_begin[G02" in line:
+                arc_mode = 2
+                if "_sim" in line: arc_by_sim = True
+                arc_count += 1
+            elif "arc_begin[G03" in line:
+                arc_mode = 3
+                if "_sim" in line: arc_by_sim = True
+                arc_count += 1
+            elif "arc_end" in line:
+                arc_mode = False
             
 
-            # select color from comment if present, else default color
-            col = comment_color if comment_color else colors[self.machine.current_motion_mode]
-            
-            # each line segment will have a gradient from selected color
-            # to either dark, or a color depending on the S value, to better
-            # illustrate the intensity of a laser for engraving.
-            color1 = col
-            ss = self.machine.current_spindle_speed
-            if ss == None:
-                color2 = (col[0], col[1], col[2], 0.3)
+            if arc_mode == False:
+                motion_mode = self.machine.current_motion_mode
             else:
-                color1 = (ss/255, ss/255, 1, 1) # blueish hue
-                color2 = (ss/255, ss/255, 1, 0.3) # blueish hue
+                motion_mode = arc_mode
                 
+            col = colors[motion_mode]
             
+            ss = self.machine.current_spindle_speed
+            
+            if arc_mode == False:
+                color1 = (col[0], col[1], col[2], 1)
+                
+                if ss == None:
+                    color2 = (col[0], col[1], col[2], 0.5)
+                else:
+                    color2 = (ss/255, ss/255, ss/255, 1)
+                    
+            else:
+                if arc_count % 2 == 0:
+                    color1 = (col[0], col[1], col[2], 0.8)
+                else:
+                    color1 = (col[0], col[1], col[2], 1)
+                    
+                if arc_by_sim == True:
+                    color2 = color1 # continuous arc
+                else:
+                    color2 = (col[0], col[1], col[2], 0.5)
+
+            if ss != None:
+                color2 = (ss/255, ss/255, ss/255, 1)
+                
+                
             # draw two gl line segments per gcode line for better visualization of commands
             target = np.array(self.machine.target_m)
             diff = np.subtract(self.machine.target_m, self.machine.position_m)
+            
             self.append_vertices([[self.machine.position_m + diff * 0.001, color1]])
             self.append_vertices([[self.machine.target_m, color2]])
             
