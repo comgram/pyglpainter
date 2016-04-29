@@ -27,8 +27,8 @@ void main()
   
   gl_FragColor = vec4(r, g, b, 1);
   
-  // simple way of striping the surface
-  if (mod(floor(vertex_id), 10) == 0) {
-    gl_FragColor = vec4(r, g, b, 0.7);
-  }
+  // simple way of striping the surface, // requires GLSL version 130
+  //if (mod(floor(vertex_id), 10) == 0) {
+  //  gl_FragColor = vec4(r, g, b, 0.7);
+  //}
 }

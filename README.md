@@ -70,7 +70,7 @@ nowadays very, very rarely zoom.
 
 ## Installation
 
-Your graphics hardware and drivers need to support at least OpenGL version 3.0 with GLSL version 1.30.
+Your graphics hardware and drivers need to support at least OpenGL version 2.1 with GLSL version 1.20.
 
 Get and install Python3 and git. Then:
 
