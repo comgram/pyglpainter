@@ -66,25 +66,37 @@ the camera forward alongs its look axis, which is more natural than
 changing the FOV of the camera. Even cameras in movies and TV series
 nowadays very, very rarely zoom.
 
+
+
 ## Installation
 
-Clone this git repository
+Your graphics hardware and drivers need to support at least OpenGL version 3.0 with GLSL version 1.30.
 
-Then install some dependencies (tested on Debian Jessie)
+Get and install Python3 and git. Then:
+
+    git clone https://github.com/michaelfranzl/pyglpainter
+    cd pyglpainter
+    git clone https://github.com/michaelfranzl/gcode_machine.git
+    
+    
+### Dependencies on Windows
+
+    pip install PyQt5
+    pip install numpy
+    pip install PyOpenGL
+    
+### Dependencies on Debian Jessie
 
     apt-get install python3-numpy python3-pyqt5 python3-pyqt5.qtopengl python3-opengl
+
+### Run example
     
-I may have forgotten other dependencies. Please let me know if something is missing.
+    python ./example.py
+
+If you are on Windows and you are getting warnings about missing .dll's, you may need to restart Windows.
 
 
-## Example
-
-All features of pyglpainter are shown in an OpenGL window (install dependencies
-first):
-
-    python3 ./example.py
-    
-#### Individual steps
+### Usage as a module in your own project
 
 You first need to create a PyQt5 window, then add to it one `PainterWidget`
 instance (for working code see `example.py`). Let's say this `PainterWidget`
@@ -98,11 +110,6 @@ with the shader program called "simple3d". Scale it by 12 and put its origin to
 the world coordinates (0,0,0).
     
 
-## TODO:
-
-* Turn this project into a more standards-compliant Python module/package
-* TRIANGLE_STRIP-based surface compund primitive
-* Support of more OpenGL features (textures, lights, etc.)
 
 ## License
 
