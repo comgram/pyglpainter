@@ -192,7 +192,7 @@ class GcodePath(Item):
                 color1 = (col[0], col[1], col[2], 1)
                 
                 if ss == None:
-                    color2 = (col[0], col[1], col[2], 0.5)
+                    color2 = (col[0], col[1], col[2], 0.3)
                 else:
                     color2 = (ss/255, ss/255, ss/255, 1)
                     
