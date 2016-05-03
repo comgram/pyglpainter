@@ -126,7 +126,7 @@ class GcodePath(Item):
             # 2 opengl segments for each logical line, see below
             offset = 2 * line_number * stride + position_size
             
-            col = np.array([1, 1, 1, 0.8], dtype=np.float32)
+            col = np.array([1, 0.5, 1, 1], dtype=np.float32)
             
             glBindBuffer(GL_ARRAY_BUFFER, self.vbo_array)
             glBufferSubData(GL_ARRAY_BUFFER, offset, color_size, col)
