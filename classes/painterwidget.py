@@ -27,6 +27,7 @@ import ctypes
 import sys
 import math
 import os
+import re
 
 from PyQt5.QtGui import QColor, QMatrix4x4, QVector2D, QVector3D, QVector4D, QQuaternion
 from PyQt5.QtOpenGL import QGLWidget
@@ -229,18 +230,22 @@ class PainterWidget(QGLWidget):
         return item
     
     
-    def item_remove(self, item_label):
+    def item_remove(self, label_regexp):
         """ Removes a previously created item. It will disappear from the
         scene.
         
-        @param item_label
-        A string containing the unique label of the previously create item.
+        @param label_regexp
+        A regular expression to match.
         """
-        for program_label in self.programs.keys():
-            if item_label in self.programs[program_label].items:
-                item = self.programs[program_label].items[item_label]
-                item.remove()
-                del self.programs[program_label].items[item_label]
+        program_labels = list(self.programs.keys())
+        
+        for program_label in program_labels:
+            item_labels = list(self.programs[program_label].items.keys())
+            for item_label in item_labels:
+                if re.match(label_regexp, item_label):
+                    item = self.programs[program_label].items[item_label]
+                    item.remove()
+                    del self.programs[program_label].items[item_label]
         
 
     def paintGL(self):
