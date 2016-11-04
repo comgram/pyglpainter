@@ -38,7 +38,7 @@ class GcodePath(Item):
     modes are drawn with different colors for better visualization.
     """
 
-    def __init__(self, label, prog_id, gcode_list, cmpos, ccs, cs_offsets):
+    def __init__(self, label, prog_id, gcode_list, cmpos, ccs, cs_offsets, do_fractionize_arcs=True):
         """
         param label
         A string containing a unique name for this item.
@@ -67,13 +67,17 @@ class GcodePath(Item):
         the position for the next movement command will be relative to the
         selected offset. This emulates the movement behavior of a classical
         CNC machine.
+        
+        @param do_fractionize_arcs
+        If True, break circular arcs into tiny lines.
+        False gives speed improvement.
         """
 
         super(GcodePath, self).__init__(label, prog_id, GL_LINE_STRIP, 2)
         
         self.machine = GcodeMachine(cmpos, ccs, cs_offsets)
         
-        self.machine.do_fractionize_arcs = True # OpenGL doesn't have a notion about arcs
+        self.machine.do_fractionize_arcs = do_fractionize_arcs # OpenGL doesn't have a notion about arcs
         self.machine.do_fractionize_lines = False
         
         self.machine.special_comment_prefix = "_sim"
@@ -82,13 +86,16 @@ class GcodePath(Item):
 
         self.gcode = []
         
-        for line in gcode_list:
-            self.machine.set_line(line)
-            self.machine.parse_state()
-            lines = self.machine.fractionize()
-            
-            self.gcode += lines
-            self.machine.done()
+        if do_fractionize_arcs == True:
+            for line in gcode_list:
+                self.machine.set_line(line)
+                self.machine.parse_state()
+                lines = self.machine.fractionize()
+                
+                self.gcode += lines
+                self.machine.done()
+        else:
+            self.gcode = gcode_list
         
         # reset, we re-run in render()
         self.machine.reset()
@@ -154,6 +161,7 @@ class GcodePath(Item):
             1: (.7, .7, 1),
             2: (.8, .7, 1),
             3: (.7, .8, 1),
+            None: (0, 0, 0),
             }
         col = colors[0] # initial color
         
@@ -177,7 +185,7 @@ class GcodePath(Item):
                 arc_count += 1
             elif "arc_end" in line:
                 arc_mode = False
-            
+
 
             if arc_mode == False:
                 motion_mode = self.machine.current_motion_mode
