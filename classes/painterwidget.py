@@ -110,7 +110,7 @@ class PainterWidget(QGLWidget):
     
     __version__ = "0.2.0"
     
-    def __init__(self, parent=None):
+    def __init__(self, parent, refresh_rate = 20):
         super(PainterWidget, self).__init__(parent)
         
         self.mat_v = QMatrix4x4() # the current View matrix
@@ -150,6 +150,8 @@ class PainterWidget(QGLWidget):
         self._translation_vec_start = None # state for mouse click
 
         self._mouse_fov_start = None # state for mouse click
+        
+        self._refresh_rate = refresh_rate
     
 
     def initializeGL(self):
@@ -179,9 +181,9 @@ class PainterWidget(QGLWidget):
         # the world background color
         glClearColor(0, 0, 0, 1.0)
 
-        # fire the timer every 10 milliseconds, yielding a maximum of 100 fps
+        # fire the timer every so many milliseconds, this determines the frames per second
         # this will re-draw the scene if self.dirty is True
-        self._timer.start(10)
+        self._timer.start(self._refresh_rate)
 
 
     def program_create(self, label, vertex_filepath, fragment_filepath, shader_opts):
