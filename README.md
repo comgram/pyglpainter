@@ -2,7 +2,7 @@
 
 Minimalistic but modern OpenGL drawing for technical applications
 
-![](http://michaelfranzl.com/wp-content/uploads/2016/04/Selection_309-1024x576.png)
+![](https://blog.michael.franzl.name/wp-content/uploads/2016/04/Selection_309-1024x576.png)
 
 This Python module provides the class `PainterWidget`, extending
 PyQt5's `QGLWidget` class with boilerplate code neccessary
